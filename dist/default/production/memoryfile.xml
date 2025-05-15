@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project>
+  <executable name="dist/default/production/counter_with_pause.X.production.elf">
+    <memory name="data">
+      <units>bytes</units>
+      <length>1024</length>
+      <used>6</used>
+      <free>1018</free>
+    </memory>
+    <memory name="program">
+      <units>bytes</units>
+      <length>11520</length>
+      <used>726</used>
+      <free>10794</free>
+    </memory>
+  </executable>
+</project>
