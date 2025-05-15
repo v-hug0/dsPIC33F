@@ -1,56 +1,110 @@
 /*
- * Trabalho 1 de Técnicas Avançadas em Microcontroladores
- * 
- * Autores:
- *      Victor Hugo Silva Maciel - 497553
- *      Eduardo Vilas Boas Simões - 509925
+ * File:   main.c
+ * Author: Victor
  *
+ * Created on 11 de Abril de 2025, 18:02
  */
 
 #include "xc.h"
 #include "p33FJ12MC202.h"
+//==============================================================================
+// Configuration Bits Summary (with practical descriptions)
+//==============================================================================
+
+/*
+ * _FOSCSEL(...) - Oscillator Startup Selection
+ * --------------------------------------------------
+ * FNOSC_FRC        -> Uses the internal Fast RC oscillator (approx. 7.37 MHz).
+ *                     Good for basic operation without external components.
+ * FNOSC_FRCPLL     -> Same as above, but with PLL for higher frequency.
+ * FNOSC_PRI        -> Uses an external oscillator (XT, HS, or EC modes).
+ *                     Required for precise clock sources.
+ * FNOSC_PRIPLL     -> External oscillator + PLL. Best for high-speed, accurate clocks.
+ * FNOSC_SOSC       -> Uses secondary low-power oscillator (usually 32.768 kHz).
+ *                     Common in low-power or RTC applications.
+ * FNOSC_LPRC       -> Low-power internal RC. Very low frequency, good for sleep modes.
+ * FNOSC_FRCDIV16   -> Internal FRC divided by 16. Lowers frequency for power saving.
+ * FNOSC_LPRCDIVN   -> Internal FRC divided by N (specific divider).
+ * IESO_ON          -> Starts with FRC and switches automatically to selected oscillator.
+ *                     Useful during startup when external oscillator takes time to stabilize.
+ * IESO_OFF         -> Starts directly with the configured oscillator.
+ */
+
+/*
+ * _FOSC(...) - Oscillator Configuration
+ * --------------------------------------------------
+ * POSCMD_EC        -> External clock input (driven by an external clock signal).
+ *                     Used when the clock is provided by another device.
+ * POSCMD_XT        -> Uses an external crystal/resonator in XT mode (mid-frequency).
+ * POSCMD_HS        -> High-Speed mode for external crystal. For higher frequency crystals.
+ * POSCMD_NONE      -> Disables the primary oscillator. Useful if not using external clock.
+
+ * OSCIOFNC_ON      -> OSC2 pin works as a general-purpose digital I/O pin.
+ * OSCIOFNC_OFF     -> OSC2 outputs the system clock. Useful for debugging clock output.
+
+ * IOL1WAY_ON       -> Peripheral Pin Select (PPS) can only be configured once after reset.
+ *                     Adds safety for pin assignment.
+ * IOL1WAY_OFF      -> PPS can be reconfigured at runtime. More flexible but riskier.
+
+ * FCKSM_CSECME     -> Enables both Clock Switching and Fail-Safe Clock Monitor.
+ *                     Allows runtime clock source changes and detects oscillator failure.
+ * FCKSM_CSECMD     -> Allows clock switching, but disables fail-safe monitoring.
+ * FCKSM_CSDCMD     -> Disables both features. Clock is fixed and no failure detection.
+ */
+
+// Internal FRC at POR
+_FOSCSEL(FNOSC_FRCPLL); 
+// Enable Clock Switching and Configure Primary Oscillator in XT mode
+_FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
+
+#define FCY  40000000
+#define BAUDRATE 9600
+#define BRGVAL ((FCY/BAUDRATE)/16)-1 // Low speed mode
 
 
-// Definição de variáveis
-int cont = 0; // Auxiliar para Timer 1
-int cont2 = 0; // Auxiliar para display de 7 seg
-int toggle_flag = 0;  // Flag para botão de pausa
 
-const int display_7seg[10] = {
-    0b00111111, // 0
-    0b00000110, // 1
-    0b01011011, // 2
-    0b01001111, // 3
-    0b01100110, // 4
-    0b01101101, // 5
-    0b01111101, // 6
-    0b00000111, // 7
-    0b01111111, // 8
-    0b01101111  // 9
-};
-
-#define DISPLAY(n)  (LATB = (LATB & 0xFF00) | display_7seg[(n)])
-
-// Configuração do clock - FRC + PLL
-_FOSCSEL(FNOSC_FRCPLL);         // Usa FRC com PLL após o reset
-_FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);  // Nenhum oscilador externo usado
-
-
-// Protótipo de funções
+// Prot?tipo de fun??es
 void PLL_Init(void);
-void TIMER_Init(void);
 void GPIO_Init(void);
-void CN_Init(void);
+void UART_Init(void);
+
+unsigned int i;
+
+//UART1Handler handler_uart1;  
+
+//uint8_t      cronos=0;
+
+//struct{
+//    uint8_t CN:2;
+//    uint8_t counter:2;
+//}flag;
 
 
 int main(void) {
-    PLL_Init(); // Configuração do oscilador interno FTC com PLL
-    TIMER_Init(); // Configuração de Timer 1
-    GPIO_Init(); // Configuração de PORTB
-    CN_Init(); // Configuração de Change Notification
-    while(1);
+    PLL_Init();
+    GPIO_Init();
+    UART_Init();
+    
+//    __builtin_enable_interrupts(); // Enables 
+    
+    while (1) {
+        // burns clock cycle   
+    }
     return 0;
 }
+
+
+ void __attribute__((__interrupt__, no_auto_psv)) _U1TXInterrupt(void)
+ {
+ IFS0bits.U1TXIF = 0; // clear TX interrupt flag
+ /* wait at least 104 usec (1/9600) before sending a char */
+ for(i = 0; i < 4126; i++)
+ {
+ Nop();
+ }
+ U1TXREG = 'a'; // Transmit one character
+ }
+ 
 
 void PLL_Init(void){
     PLLFBD = 41; // M = 43
@@ -59,68 +113,24 @@ void PLL_Init(void){
     while (OSCCONbits.COSC != 0b001);
 };
 
-void TIMER_Init(void){
-    T1CONbits.TON = 0; // Timer desabilitado para configuração
-    T1CONbits.TCS = 0; // Seleciona-se Fcy (Fosc/2) como fonte de clock para o Timer1
-    T1CONbits.TGATE = 0; // Modo Gate desabilitado
-    T1CONbits.TCKPS = 0b11; // Seleção de 1:256 de prescaler
-    TMR1 = 0x00;
-    PR1  = 15625;
-     /* ---- Cálculo do período de interrupção:----
-      Fcy = 40 MHz
-      Prescaler (PRE) = 256
-      PR1 = 15625
-      
-      Fint_T1 = Fcy / (PRE * PR1)
-              = 40.000.000 / (256 * 15625)
-              = 40.000.000 / 4.000.000
-              = 10 Hz ? Interrupção a cada 0,1 s (100 ms)   */
-    IPC0bits.T1IP = 1; // Prioridade de interrupção
-    IFS0bits.T1IF = 0; // Limpar flag de interrupção
-    IEC0bits.T1IE = 1; // Habilitar interrupção
-    T1CONbits.TON = 1; // Habilitar o Timer1
-};
-
 void GPIO_Init(void){
     TRISB = 0;
 };
 
-void CN_Init(void){
-    CNEN1bits.CN0IE = 1; // Enable CN3 pin for interrupt detection
-    //IPC4bits.CNIP = 1;
-    IFS1bits.CNIF = 0; // Reset CN interrupt
-    IEC1bits.CNIE = 1; // Enable CN interrupts
-};
-
-
-// ISR - Timer 1
-void __attribute__((__interrupt__,_auto_psv)) _T1Interrupt(void)
-{
-	IFS0bits.T1IF = 0;
-    
-    if(cont<10){
-        cont++;   
-    } else {
-        cont=0;
-        if(cont2<10){
-            DISPLAY(cont2); // Roda
-            cont2++;
-        } else {
-            cont2 = 0;
-        }
-    }
-};
-
-// ISR - Change Notification
-void __attribute__ ((__interrupt__)) _CNInterrupt(void)
-{
-    // Lógica para controle de pausa com o botão
-    if(toggle_flag==0){
-        T1CONbits.TON = !T1CONbits.TON; // Interrupção do Timer 1 até o botão ser pressionado novamente
-        toggle_flag++;
-    } else {
-        toggle_flag--;
-    }
-    IFS1bits.CNIF = 0; // Limpa flag de interrupção CN      
-};
-
+void UART_Init(void){
+    U1MODEbits.STSEL = 0; // 1-stop bit
+    U1MODEbits.PDSEL = 0; // No Parity, 8-data bits
+    U1MODEbits.ABAUD = 0; // Auto-Baud Disabled
+    U1MODEbits.BRGH = 0; // Low Speed mode
+    U1BRG = BRGVAL; // BAUD Rate Setting for 9600
+    U1STAbits.UTXISEL0 = 0; // Interrupt after one Tx character is 
+    // transmitted
+    U1STAbits.UTXISEL1 = 0;
+    IEC0bits.U1TXIE = 1; // Enable UART Tx interrupt
+    U1MODEbits.UARTEN = 1; // Enable UART
+    U1STAbits.UTXEN = 1; // Enable UART Tx
+    TRISBbits.TRISB3 = 0; // TX in RP3
+    RPOR1 = 0x0300;
+    U1TXREG = 'a'; // Transmit one character
+    while(1);
+}
