@@ -7,6 +7,9 @@
 
 #include "xc.h"
 #include "p33FJ12MC202.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>:
 //==============================================================================
 // Configuration Bits Summary (with practical descriptions)
 //==============================================================================
@@ -61,12 +64,23 @@ _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
 #define BAUDRATE 9600
 #define BRGVAL ((FCY/BAUDRATE)/16)-1 // Low speed mode
 
+#define _UART_BUFF_SIZE 128
+typedef struct{
+    char buff[_UART_BUFF_SIZE];
+    volatile uint16_t length;
+    volatile uint16_t index;
+    volatile uint8_t busy:2;
+}UARTHandler;
 
+UARTHandler huart1;
 
-// Prot?tipo de fun??es
+// Prototipo de funcoes
 void PLL_Init(void);
 void GPIO_Init(void);
+void TIMER2_Init(void);
 void UART_Init(void);
+void UART_TX_Init(void);
+uint8_t sendString(char* str, UARTHandler* handler);
 
 unsigned int i;
 
@@ -83,10 +97,8 @@ unsigned int i;
 int main(void) {
     PLL_Init();
     GPIO_Init();
+    TIMER2_Init();
     UART_Init();
-    
-//    __builtin_enable_interrupts(); // Enables 
-    
     while (1) {
         // burns clock cycle   
     }
@@ -94,43 +106,100 @@ int main(void) {
 }
 
 
+void __attribute__((__interrupt__,no_auto_psv)) _T2Interrupt(void)
+{
+    IFS0bits.T2IF = 0;  // Clear Flag 
+    sendString("Micros 2!\n\r",&huart1);    
+    LATBbits.LATB1 ^= 1;     // to make sure the time is right
+}
+
  void __attribute__((__interrupt__, no_auto_psv)) _U1TXInterrupt(void)
  {
- IFS0bits.U1TXIF = 0; // clear TX interrupt flag
- /* wait at least 104 usec (1/9600) before sending a char */
- for(i = 0; i < 4126; i++)
- {
- Nop();
- }
- U1TXREG = 'a'; // Transmit one character
+    IFS0bits.U1TXIF = 0; // clear TX interrupt flag
+    if (huart1.index < huart1.length) {
+        U1TXREG = huart1.buff[huart1.index++];
+    } else {
+        huart1.busy = 0;
+    }
  }
  
-
-void PLL_Init(void){
-    PLLFBD = 41; // M = 43
-    CLKDIVbits.PLLPOST=0; // N1 = 2
-    CLKDIVbits.PLLPRE=0; // N2 = 2
+void PLL_Init(void)
+{
+    PLLFBD = 41;                    // M = 43
+    CLKDIVbits.PLLPOST  = 0;        // N1 = 2
+    CLKDIVbits.PLLPRE   = 0;        // N2 = 2
     while (OSCCONbits.COSC != 0b001);
 };
 
-void GPIO_Init(void){
+void GPIO_Init(void)
+{
     TRISB = 0;
 };
 
-void UART_Init(void){
-    U1MODEbits.STSEL = 0; // 1-stop bit
-    U1MODEbits.PDSEL = 0; // No Parity, 8-data bits
-    U1MODEbits.ABAUD = 0; // Auto-Baud Disabled
-    U1MODEbits.BRGH = 0; // Low Speed mode
-    U1BRG = BRGVAL; // BAUD Rate Setting for 9600
-    U1STAbits.UTXISEL0 = 0; // Interrupt after one Tx character is 
-    // transmitted
-    U1STAbits.UTXISEL1 = 0;
-    IEC0bits.U1TXIE = 1; // Enable UART Tx interrupt
-    U1MODEbits.UARTEN = 1; // Enable UART
-    U1STAbits.UTXEN = 1; // Enable UART Tx
-    TRISBbits.TRISB3 = 0; // TX in RP3
-    RPOR1 = 0x0300;
-    U1TXREG = 'a'; // Transmit one character
+void TIMER2_Init(void)
+{
+    T2CONbits.TON       = 0;
+    T2CONbits.T32       = 0;
+    T2CONbits.TCS       = 0;
+    T2CONbits.TGATE     = 0;
+    T2CONbits.TCKPS     = 0b11;
+    #define FINT 0.5
+    #define PRESCALER 256
+    #define PR2_VAL (FCY/(PRESCALER*FINT))
+    PR2                 = PR2_VAL;
+    TMR2                = 0;
+    IPC1bits.T2IP       = 0x01;
+    IFS0bits.T2IF       = 0;
+    IEC0bits.T2IE       = 1;
+    T2CONbits.TON       = 1;
+}
+
+void UART_Init(void)
+{
+    U1MODEbits.STSEL    = 0;        // 1-stop bit
+    U1MODEbits.PDSEL    = 0;        // No Parity, 8-data bits
+    U1MODEbits.ABAUD    = 0;        // Auto-Baud Disabled
+    U1MODEbits.BRGH     = 0;        // Low Speed mode
+    U1BRG = BRGVAL;                 // BAUD Rate Setting for 9600
+    UART_TX_Init();
+    //UART_RX_Init();
     while(1);
 }
+
+void UART_TX_Init(void)
+{
+    U1STAbits.UTXISEL0  = 0;        // Interrupt after one Tx character is 
+    // transmitted
+    U1STAbits.UTXISEL1  = 0;
+    IEC0bits.U1TXIE     = 1;        // Enable UART Tx interrupt
+    U1MODEbits.UARTEN   = 1;        // Enable UART
+    U1STAbits.UTXEN     = 1;        // Enable UART Tx
+    TRISBbits.TRISB3    = 0;        // TX in RP3
+    RPOR1 = 0x0300;
+}
+
+
+//void UART_RX_Init(void){
+//}
+
+uint8_t sendString(char* str, UARTHandler* handler)
+{
+    // Return if UART is currently busy
+    if (handler->busy) return 0;
+    // Get string length
+    uint16_t len = strlen(str);
+    if (len == 0 || len >= _UART_BUFF_SIZE) return 0;
+    // Safe copy to buffer, with boundary check
+    for (uint16_t i = 0; i < len; i++) {
+        handler->buff[i] = str[i];
+    }
+    handler->length = len;
+    handler->index = 1;
+    handler->busy = 1;
+    // Start transmission by writing first character to UART
+    U1TXREG = handler->buff[0];
+    return 1;
+}
+
+
+
