@@ -73,11 +73,15 @@ typedef struct{
 }UARTHandler;
 
 UARTHandler huart1;
+ unsigned int timePeriod = 0;
+ char msg[64];
+
 
 // Prototipo de funcoes
 void PLL_Init(void);
 void GPIO_Init(void);
 void TIMER2_Init(void);
+void INPUT_CAP_Init(void);
 void UART_Init(void);
 void UART_TX_Init(void);
 uint8_t sendString(char* str, UARTHandler* handler);
@@ -98,6 +102,7 @@ int main(void) {
     PLL_Init();
     GPIO_Init();
     TIMER2_Init();
+    INPUT_CAP_Init();
     UART_Init();
     while (1) {
         // burns clock cycle   
@@ -122,7 +127,30 @@ void __attribute__((__interrupt__,no_auto_psv)) _T2Interrupt(void)
         huart1.busy = 0;
     }
  }
- 
+
+// Essa interrup??o s? vai entrar a cada dois estouros (ou seja, com duas posi??es do buffer cheias)
+void __attribute__((interrupt, shadow, no_auto_psv)) _IC1Interrupt(void)
+{
+	IFS0bits.IC1IF = 0;
+	unsigned int t1,t2;
+	t1 = IC1BUF;
+	t2 = IC1BUF;
+	if(t2>t1)
+		timePeriod = t2-t1;
+	else // ? FIFO (o ponteiro muda), e o contador n?o reseta
+		timePeriod = (PR2-t1)+t2; 
+    
+    t2=t1;
+    
+    if (timePeriod != 0) {
+        unsigned long freq_hz = FCY/(256*(unsigned long)timePeriod);
+        unsigned long freq_rpm = freq_hz*60;
+        sprintf(msg,"Velocidade = %d \n\r", freq_rpm);
+        sendString(msg,&huart1);
+    }
+}
+
+
 void PLL_Init(void)
 {
     PLLFBD = 41;                    // M = 43
@@ -134,6 +162,13 @@ void PLL_Init(void)
 void GPIO_Init(void)
 {
     TRISB = 0;
+    TRISBbits.TRISB0 = 0;       // LED (sa?da)
+    TRISBbits.TRISB1 = 1;       // Entrada para IC1
+    TRISBbits.TRISB9 = 0;       // TX
+    TRISBbits.TRISB10 = 1;      // RX
+    RPOR4bits.RP9R = 0b00011;   // TX UART
+    RPINR18bits.U1RXR = 0b1010; // RX UART
+    RPINR7bits.IC1R = 0b0001;   // IC1 = RB1
 };
 
 void TIMER2_Init(void)
@@ -143,15 +178,26 @@ void TIMER2_Init(void)
     T2CONbits.TCS       = 0;
     T2CONbits.TGATE     = 0;
     T2CONbits.TCKPS     = 0b11;
-    #define FINT 0.5
-    #define PRESCALER 256
-    #define PR2_VAL (FCY/(PRESCALER*FINT))
-    PR2                 = PR2_VAL;
+    PR2                 = 0xFFFF;
     TMR2                = 0;
-    IPC1bits.T2IP       = 0x01;
+    //IPC1bits.T2IP       = 0x01;
     IFS0bits.T2IF       = 0;
-    IEC0bits.T2IE       = 1;
+    IEC0bits.T2IE       = 0;
     T2CONbits.TON       = 1;
+}
+
+void INPUT_CAP_Init(void)
+{    
+    // Initialize the input capture module
+    IC1CONbits.ICM = 0b00; // Disable Input Capture 1 module
+    IC1CONbits.ICTMR = 1; // Select Timer2 as the IC1 Time Base
+    IC1CONbits.ICI = 0b01; // Interrupt on every second capture event
+    IC1CONbits.ICM = 0b011; // Generate capture event on every rising edge
+
+    // Enable capture interrupt and timer 2
+    IPC0bits.IC1IP = 1; // Setup IC1 interrupt priority level
+    IFS0bits.IC1IF = 0; // Clear IC1 interrupt status flag
+    IEC0bits.IC1IE = 1; // Enable IC1 interrupt
 }
 
 void UART_Init(void)
@@ -174,8 +220,6 @@ void UART_TX_Init(void)
     IEC0bits.U1TXIE     = 1;        // Enable UART Tx interrupt
     U1MODEbits.UARTEN   = 1;        // Enable UART
     U1STAbits.UTXEN     = 1;        // Enable UART Tx
-    TRISBbits.TRISB3    = 0;        // TX in RP3
-    RPOR1 = 0x0300;
 }
 
 
@@ -196,6 +240,7 @@ uint8_t sendString(char* str, UARTHandler* handler)
     handler->length = len;
     handler->index = 1;
     handler->busy = 1;
+    
     // Start transmission by writing first character to UART
     U1TXREG = handler->buff[0];
     return 1;
