@@ -9,7 +9,9 @@
 #include "p33FJ12MC202.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>:
+#include <string.h>
+#include <stdint.h>
+
 //==============================================================================
 // Configuration Bits Summary (with practical descriptions)
 //==============================================================================
@@ -85,18 +87,9 @@ void INPUT_CAP_Init(void);
 void UART_Init(void);
 void UART_TX_Init(void);
 uint8_t sendString(char* str, UARTHandler* handler);
+static void toString(unsigned long number, char* str);
 
 unsigned int i;
-
-//UART1Handler handler_uart1;  
-
-//uint8_t      cronos=0;
-
-//struct{
-//    uint8_t CN:2;
-//    uint8_t counter:2;
-//}flag;
-
 
 int main(void) {
     PLL_Init();
@@ -108,14 +101,6 @@ int main(void) {
         // burns clock cycle   
     }
     return 0;
-}
-
-
-void __attribute__((__interrupt__,no_auto_psv)) _T2Interrupt(void)
-{
-    IFS0bits.T2IF = 0;  // Clear Flag 
-    sendString("Micros 2!\n\r",&huart1);    
-    LATBbits.LATB1 ^= 1;     // to make sure the time is right
 }
 
  void __attribute__((__interrupt__, no_auto_psv)) _U1TXInterrupt(void)
@@ -144,16 +129,8 @@ void __attribute__((interrupt, no_auto_psv)) _IC1Interrupt(void)
     
     if (timePeriod != 0) {
         unsigned long freq_hz = FCY/(256*(unsigned long)timePeriod);
-        int freq_rpm = freq_hz*60;
-        sprintf(msg,"Velocidade = %d \n\r", freq_rpm);
-        sendString(msg,&huart1);
-    }
-}
-
-static void TX_string(char* str){
-    while (*str) {
-        while (U1STAbits.UTXBF); // Espera buffer vazio
-        U1TXREG = *str++;
+        unsigned long freq_rpm = freq_hz*60;
+        sprintf(msg,"Velocidade = %lu RPM \n\r", freq_rpm);
     }
 }
 
@@ -168,13 +145,15 @@ void PLL_Init(void)
 void GPIO_Init(void)
 {
     TRISB = 0;
-    TRISBbits.TRISB0 = 0;       // LED (sa?da)
-    TRISBbits.TRISB1 = 1;       // Entrada para IC1
-    TRISBbits.TRISB9 = 0;       // TX
-    TRISBbits.TRISB10 = 1;      // RX
-    RPOR4bits.RP9R = 0b00011;   // TX UART
-    RPINR18bits.U1RXR = 0b1010; // RX UART
-    RPINR7bits.IC1R = 0b0001;   // IC1 = RB1
+    
+    TRISBbits.TRISB13 = 1;       // RB1 configurado como Entrada
+    RPINR7bits.IC1R = 0b1101;   // RB1/RP1 mapeado para Input Capture 1
+    
+    TRISBbits.TRISB9 = 0;       // RB9 configurado como Saída
+    RPOR1bits.RP3R = 0b00011;   // TX UART
+    
+    //TRISBbits.TRISB10 = 1;      // RX entrada
+    //RPINR18bits.U1RXR = 0b1010; // RX UART mapeada
 };
 
 void TIMER2_Init(void)
@@ -228,9 +207,6 @@ void UART_TX_Init(void)
 }
 
 
-//void UART_RX_Init(void){
-//}
-
 uint8_t sendString(char* str, UARTHandler* handler)
 {
     // Return if UART is currently busy
@@ -251,5 +227,28 @@ uint8_t sendString(char* str, UARTHandler* handler)
     return 1;
 }
 
-
-
+static void toString(unsigned long number, char* str) {
+    char temp[20];
+    int i = 0;
+    
+    // Caso especial para o número 0
+    if (number == 0) {
+        str[0] = '0';
+        str[1] = '\0';
+        return;
+    }
+    
+    // Salva o número em ordem reversa
+    do {
+        temp[i++] = (number % 10) + '0';
+        number /= 10;
+    } while (number > 0);
+    
+    // Inverte a ordem dos caracteres
+    int j = 0;
+    while (i > 0) {
+        str[j++] = temp[--i];
+    }
+    
+    str[j] = '\0'; // Finaliza a string
+}
