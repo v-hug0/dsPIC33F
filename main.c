@@ -87,7 +87,6 @@ void INPUT_CAP_Init(void);
 void UART_Init(void);
 void UART_TX_Init(void);
 uint8_t sendString(char* str, UARTHandler* handler);
-static void toString(unsigned long number, char* str);
 
 unsigned int i;
 
@@ -131,6 +130,7 @@ void __attribute__((interrupt, no_auto_psv)) _IC1Interrupt(void)
         unsigned long freq_hz = FCY/(256*(unsigned long)timePeriod);
         unsigned long freq_rpm = freq_hz*60;
         sprintf(msg,"Velocidade = %lu RPM \n\r", freq_rpm);
+        sendString(msg,&huart1);
     }
 }
 
@@ -225,30 +225,4 @@ uint8_t sendString(char* str, UARTHandler* handler)
     // Start transmission by writing first character to UART
     U1TXREG = handler->buff[0];
     return 1;
-}
-
-static void toString(unsigned long number, char* str) {
-    char temp[20];
-    int i = 0;
-    
-    // Caso especial para o número 0
-    if (number == 0) {
-        str[0] = '0';
-        str[1] = '\0';
-        return;
-    }
-    
-    // Salva o número em ordem reversa
-    do {
-        temp[i++] = (number % 10) + '0';
-        number /= 10;
-    } while (number > 0);
-    
-    // Inverte a ordem dos caracteres
-    int j = 0;
-    while (i > 0) {
-        str[j++] = temp[--i];
-    }
-    
-    str[j] = '\0'; // Finaliza a string
 }
