@@ -129,7 +129,7 @@ void __attribute__((__interrupt__,no_auto_psv)) _T2Interrupt(void)
  }
 
 // Essa interrup??o s? vai entrar a cada dois estouros (ou seja, com duas posi??es do buffer cheias)
-void __attribute__((interrupt, shadow, no_auto_psv)) _IC1Interrupt(void)
+void __attribute__((interrupt, no_auto_psv)) _IC1Interrupt(void)
 {
 	IFS0bits.IC1IF = 0;
 	unsigned int t1,t2;
@@ -144,12 +144,18 @@ void __attribute__((interrupt, shadow, no_auto_psv)) _IC1Interrupt(void)
     
     if (timePeriod != 0) {
         unsigned long freq_hz = FCY/(256*(unsigned long)timePeriod);
-        unsigned long freq_rpm = freq_hz*60;
+        int freq_rpm = freq_hz*60;
         sprintf(msg,"Velocidade = %d \n\r", freq_rpm);
         sendString(msg,&huart1);
     }
 }
 
+static void TX_string(char* str){
+    while (*str) {
+        while (U1STAbits.UTXBF); // Espera buffer vazio
+        U1TXREG = *str++;
+    }
+}
 
 void PLL_Init(void)
 {
@@ -193,7 +199,6 @@ void INPUT_CAP_Init(void)
     IC1CONbits.ICTMR = 1; // Select Timer2 as the IC1 Time Base
     IC1CONbits.ICI = 0b01; // Interrupt on every second capture event
     IC1CONbits.ICM = 0b011; // Generate capture event on every rising edge
-
     // Enable capture interrupt and timer 2
     IPC0bits.IC1IP = 1; // Setup IC1 interrupt priority level
     IFS0bits.IC1IF = 0; // Clear IC1 interrupt status flag
