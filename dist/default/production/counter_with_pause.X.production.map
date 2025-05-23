@@ -243,9 +243,9 @@ __FUID3
 .comment
  *(.comment)
 
-.debug_info       0x000000        0xc23
+.debug_info       0x000000        0xc29
  *(.debug_info)
- .debug_info      0x000000        0xc23 build/default/production/main.o
+ .debug_info      0x000000        0xc29 build/default/production/main.o
  *(.gnu.linkonce.wi.*)
 
 .debug_abbrev     0x000000         0xfe

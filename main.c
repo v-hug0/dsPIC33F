@@ -63,17 +63,21 @@ _FOSCSEL(FNOSC_FRCPLL);
 _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
 
 #define FCY 40000000
-#define FPWM
-#define PRESCALER
-#define P11TP_VALUE FCY/(FPWM*PRESCALER)-1  
+#define FPWM 4000
+#define PRESCALER 1
+#define PERIOD (FCY/(FPWM*PRESCALER)-1) 
+#define DUTY_CYCLE(percent) ((uint16_t)((2 * PERIOD * (percent)) / 100))
+
+#define MAX DUTY_CYCLE(95)  // 19998
+#define MIN DUTY_CYCLE(5)   // 999 
 
 #define B1 PORTBbits.RB0
 #define B2 PORTBbits.RB1
 #define B3 PORTBbits.RB2
 #define B4 PORTBbits.RB3
 
-#define MAX 18998
-#define MIN 999
+//#define MAX 18998
+//#define MIN 999
 
 // Prototipo de funcoes
 void PLL_Init(void);
@@ -103,14 +107,14 @@ void PLL_Init(void)
 
 void GPIO_Init(void)
 {
-    // Modo de entrada dos bot�es
+    // Modo de entrada dos botoes
     TRISBbits.TRISB0 = 1;
     TRISBbits.TRISB1 = 1;
     TRISBbits.TRISB2 = 1;
     TRISBbits.TRISB3 = 1;
     // Desabilita analogico
     AD1PCFGL = 0xFFFF;
-    // Modo de sa�da do LED
+    // Modo de saida do LED
     TRISBbits.TRISB10 = 0; 
     TRISBbits.TRISB12 = 0;
     TRISBbits.TRISB14 = 0;
@@ -122,9 +126,8 @@ void MCPWM_Init(void)
     P1TCONbits.PTEN = 0;        
     P1TCONbits.PTMOD = 0b00;    // modo free run (dente de serra) - edge al
     P1TCONbits.PTCKPS = 0b00;   // prescaler 1:1        
-    // Per�odo do PWM
-    P1TPER = 9999;
-    
+    // Periodo do PWM
+    P1TPER = PERIOD;
     // Habilitar o perif�rico no pino I/O
     PWM1CON1bits.PEN1H = 1;
     PWM1CON1bits.PEN2H = 1;
@@ -140,23 +143,23 @@ void MCPWM_Init(void)
 void setRGB()
 {
    if(B1){          // AMARELO
-     PDC1 = MAX;
-     PDC2 = MAX;
-     PDC3 = MIN;
+     P1DC1 = MAX;
+     P1DC2 = MAX;
+     P1DC3 = MIN;
    }  
    else if(B2){     // VERDE
-     PDC1 = MIN;
-     PDC2 = MAX;
-     PDC3 = MIN;
+     P1DC1 = MIN;
+     P1DC2 = MAX;
+     P1DC3 = MIN;
    }
    else if(B3){     // AZUL
-     PDC1 = MIN;
-     PDC2 = MIN;
-     PDC3 = MAX;
+     P1DC1 = MIN;
+     P1DC2 = MIN;
+     P1DC3 = MAX;
    }
    else if(B4){     // BRANCO
-       PDC1 = MAX;
-       PDC2 = MAX;
-       PDC3 = MAX;
+     P1DC1 = MAX;
+     P1DC2 = MAX;
+     P1DC3 = MAX;
    }
 }
