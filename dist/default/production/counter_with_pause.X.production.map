@@ -63,10 +63,10 @@ Default Scalar Model: Small
 section                    address   length (PC units)   length (bytes) (dec)
 -------                    -------   -----------------   --------------------
 .text                        0x200                0xce           0x135  (309)
-.text                        0x2ce                0xce           0x135  (309)
-.dinit                       0x39c                 0x8             0xc  (12)
+.text                        0x2ce                0xd2           0x13b  (315)
+.dinit                       0x3a0                 0x8             0xc  (12)
 
-                 Total "program" memory used (bytes):          0x276  (630) 5%
+                 Total "program" memory used (bytes):          0x27c  (636) 5%
 
 
 "data" Memory  [Origin = 0x800, Length = 0x400]
@@ -108,13 +108,13 @@ External Symbols in Program Memory (by address):
                   0x0002ce                  _main
                   0x0002da                  _PLL_Init
                   0x000302                  _GPIO_Init
-                  0x000316                  _MCPWM_Init
-                  0x000340                  _setRGB
+                  0x00031a                  _MCPWM_Init
+                  0x000344                  _setRGB
 
 External Symbols in Program Memory (by name):
 
                   0x000302                  _GPIO_Init
-                  0x000316                  _MCPWM_Init
+                  0x00031a                  _MCPWM_Init
                   0x0002da                  _PLL_Init
                   0x0002c8                  __DefaultInterrupt
                   0x000252                  __data_init
@@ -122,7 +122,7 @@ External Symbols in Program Memory (by name):
                   0x00023c                  __psv_init
                   0x000200                  __resetPRI
                   0x0002ce                  _main
-                  0x000340                  _setRGB
+                  0x000344                  _setRGB
 
 Memory Configuration
 
@@ -243,26 +243,26 @@ __FUID3
 .comment
  *(.comment)
 
-.debug_info       0x000000        0xc07
+.debug_info       0x000000        0xc23
  *(.debug_info)
- .debug_info      0x000000        0xc07 build/default/production/main.o
+ .debug_info      0x000000        0xc23 build/default/production/main.o
  *(.gnu.linkonce.wi.*)
 
 .debug_abbrev     0x000000         0xfe
  *(.debug_abbrev)
  .debug_abbrev    0x000000         0xfe build/default/production/main.o
 
-.debug_line       0x000000        0x10f
+.debug_line       0x000000        0x110
  *(.debug_line)
- .debug_line      0x000000        0x10f build/default/production/main.o
+ .debug_line      0x000000        0x110 build/default/production/main.o
 
 .debug_frame      0x000000         0x96
  *(.debug_frame)
  .debug_frame     0x000000         0x96 build/default/production/main.o
 
-.debug_str        0x000000         0x42
+.debug_str        0x000000         0x4b
  *(.debug_str)
- .debug_str       0x000000         0x42 build/default/production/main.o
+ .debug_str       0x000000         0x4b build/default/production/main.o
 
 .debug_loc
  *(.debug_loc)
@@ -938,13 +938,13 @@ __c30_signature
  .nbss              0x0800          0x2 build/default/production/main.o
                     0x0800                  _i
 
-.text             0x0002ce         0xce
- .text            0x0002ce         0xce build/default/production/main.o
+.text             0x0002ce         0xd2
+ .text            0x0002ce         0xd2 build/default/production/main.o
                   0x0002ce                  _main
                   0x0002da                  _PLL_Init
                   0x000302                  _GPIO_Init
-                  0x000316                  _MCPWM_Init
-                  0x000340                  _setRGB
+                  0x00031a                  _MCPWM_Init
+                  0x000344                  _setRGB
 
-.dinit            0x00039c          0x8
- .dinit           0x00039c          0x8 data_init
+.dinit            0x0003a0          0x8
+ .dinit           0x0003a0          0x8 data_init

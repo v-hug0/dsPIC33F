@@ -103,12 +103,14 @@ void PLL_Init(void)
 
 void GPIO_Init(void)
 {
-    // Modo de entrada dos botões
+    // Modo de entrada dos botï¿½es
     TRISBbits.TRISB0 = 1;
     TRISBbits.TRISB1 = 1;
     TRISBbits.TRISB2 = 1;
     TRISBbits.TRISB3 = 1;
-    // Modo de saída do LED
+    // Desabilita analogico
+    AD1PCFGL = 0xFFFF;
+    // Modo de saï¿½da do LED
     TRISBbits.TRISB10 = 0; 
     TRISBbits.TRISB12 = 0;
     TRISBbits.TRISB14 = 0;
@@ -118,12 +120,12 @@ void MCPWM_Init(void)
 {
     // Base de tempo
     P1TCONbits.PTEN = 0;        
-    P1TCONbits.PTMOD = 0b00;    // modo free run (dente de serra)
+    P1TCONbits.PTMOD = 0b00;    // modo free run (dente de serra) - edge al
     P1TCONbits.PTCKPS = 0b00;   // prescaler 1:1        
-    // Período do PWM
+    // Perï¿½odo do PWM
     P1TPER = 9999;
     
-    // Habilitar o periférico no pino I/O
+    // Habilitar o perifï¿½rico no pino I/O
     PWM1CON1bits.PEN1H = 1;
     PWM1CON1bits.PEN2H = 1;
     PWM1CON1bits.PEN3H = 1;
