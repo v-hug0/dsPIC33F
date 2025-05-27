@@ -63,10 +63,10 @@ Default Scalar Model: Small
 section                    address   length (PC units)   length (bytes) (dec)
 -------                    -------   -----------------   --------------------
 .text                        0x200                0xce           0x135  (309)
-.text                        0x2ce                0xfc           0x17a  (378)
-.dinit                       0x3ca                 0x8             0xc  (12)
+.text                        0x2ce               0x114           0x19e  (414)
+.dinit                       0x3e2                 0x8             0xc  (12)
 
-                 Total "program" memory used (bytes):          0x2bb  (699) 6%
+                 Total "program" memory used (bytes):          0x2df  (735) 6%
 
 
 "data" Memory  [Origin = 0x800, Length = 0x400]
@@ -108,23 +108,27 @@ External Symbols in Program Memory (by address):
                   0x000252                  __data_init_standard
                   0x0002c8                  __DefaultInterrupt
                   0x0002ce                  _main
-                  0x00034a                  _PLL_Init
-                  0x000372                  _GPIO_Init
-                  0x00038c                  _MCPWM_Init
-                  0x0003b6                  _AD_Init
+                  0x0002e2                  _PLL_Init
+                  0x00030a                  _GPIO_Init
+                  0x000324                  _MCPWM_Init
+                  0x00034e                  _AD_Init
+                  0x000362                  _ADC_start
+                  0x000392                  _setRGB
 
 External Symbols in Program Memory (by name):
 
-                  0x0003b6                  _AD_Init
-                  0x000372                  _GPIO_Init
-                  0x00038c                  _MCPWM_Init
-                  0x00034a                  _PLL_Init
+                  0x000362                  _ADC_start
+                  0x00034e                  _AD_Init
+                  0x00030a                  _GPIO_Init
+                  0x000324                  _MCPWM_Init
+                  0x0002e2                  _PLL_Init
                   0x0002c8                  __DefaultInterrupt
                   0x000252                  __data_init
                   0x000252                  __data_init_standard
                   0x00023c                  __psv_init
                   0x000200                  __resetPRI
                   0x0002ce                  _main
+                  0x000392                  _setRGB
 
 Memory Configuration
 
@@ -245,22 +249,22 @@ __FUID3
 .comment
  *(.comment)
 
-.debug_info       0x000000        0xe1e
+.debug_info       0x000000        0xe72
  *(.debug_info)
- .debug_info      0x000000        0xe1e build/default/production/main.o
+ .debug_info      0x000000        0xe72 build/default/production/main.o
  *(.gnu.linkonce.wi.*)
 
-.debug_abbrev     0x000000        0x13a
+.debug_abbrev     0x000000        0x177
  *(.debug_abbrev)
- .debug_abbrev    0x000000        0x13a build/default/production/main.o
+ .debug_abbrev    0x000000        0x177 build/default/production/main.o
 
-.debug_line       0x000000        0x123
+.debug_line       0x000000        0x120
  *(.debug_line)
- .debug_line      0x000000        0x123 build/default/production/main.o
+ .debug_line      0x000000        0x120 build/default/production/main.o
 
-.debug_frame      0x000000         0x96
+.debug_frame      0x000000         0xca
  *(.debug_frame)
- .debug_frame     0x000000         0x96 build/default/production/main.o
+ .debug_frame     0x000000         0xca build/default/production/main.o
 
 .debug_str        0x000000         0x6c
  *(.debug_str)
@@ -273,10 +277,10 @@ __FUID3
  *(.debug_macinfo)
 
 .debug_pubnames
-                  0x000000         0x7b
+                  0x000000         0x94
  *(.debug_pubnames)
  .debug_pubnames
-                  0x000000         0x7b build/default/production/main.o
+                  0x000000         0x94 build/default/production/main.o
 
 .debug_ranges
  *(.debug_ranges)
@@ -941,13 +945,15 @@ __c30_signature
                     0x0800                  _adcValue
                     0x0802                  _i
 
-.text             0x0002ce         0xfc
- .text            0x0002ce         0xfc build/default/production/main.o
+.text             0x0002ce        0x114
+ .text            0x0002ce        0x114 build/default/production/main.o
                   0x0002ce                  _main
-                  0x00034a                  _PLL_Init
-                  0x000372                  _GPIO_Init
-                  0x00038c                  _MCPWM_Init
-                  0x0003b6                  _AD_Init
+                  0x0002e2                  _PLL_Init
+                  0x00030a                  _GPIO_Init
+                  0x000324                  _MCPWM_Init
+                  0x00034e                  _AD_Init
+                  0x000362                  _ADC_start
+                  0x000392                  _setRGB
 
-.dinit            0x0003ca          0x8
- .dinit           0x0003ca          0x8 data_init
+.dinit            0x0003e2          0x8
+ .dinit           0x0003e2          0x8 data_init

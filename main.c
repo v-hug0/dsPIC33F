@@ -97,27 +97,8 @@ int main(void) {
     MCPWM_Init();
     AD_Init();   
     while (1) { 
-        AD1CON1bits.ADON = 1; // Turn ADC ON
-        AD1CON1bits.SAMP = 1; // starts sampling
-        for(int i = 0; i < 100; i++);
-        AD1CON1bits.SAMP = 0; // start converting
-        while (!AD1CON1bits.DONE);
-        adcValue = ADC1BUF0;
-        if(adcValue < 204){              // VERMELHO
-          P1DC1 = MAX;
-          P1DC2 = MIN;
-          P1DC3 = MIN;
-        }
-        else if((adcValue > 204) && (adcValue < 612)){    // AMARELO
-          P1DC1 = MAX;
-          P1DC2 = MAX;
-          P1DC3 = MIN;
-        }  
-        else if(adcValue >= 612 ){     // VERDE
-          P1DC1 = MIN;
-          P1DC2 = MAX;
-          P1DC3 = MIN;
-        }
+        adcValue = ADC_start();
+        setRGB(adcValue);
     }
     return 0;
 }
@@ -177,3 +158,33 @@ void AD_Init(void)
     
 }
 
+int ADC_start(void)
+{
+    int adc = 0;
+    AD1CON1bits.ADON = 1; // Turn ADC ON
+    AD1CON1bits.SAMP = 1; // starts sampling
+    for(int i = 0; i < 100; i++);
+    AD1CON1bits.SAMP = 0; // start converting
+    while (!AD1CON1bits.DONE);
+    adc = ADC1BUF0;
+    return adc;
+}
+
+void setRGB(int adc)
+{
+   if(adc <= 205){              // VERMELHO
+     P1DC1 = MAX;
+     P1DC2 = MIN;
+     P1DC3 = MIN;
+   }
+   else if((adc > 205) && (adc < 612)){    // AMARELO
+     P1DC1 = MAX;
+     P1DC2 = MAX;
+     P1DC3 = MIN;
+   }  
+   else if(adc >= 612 ){     // VERDE
+     P1DC1 = MIN;
+     P1DC2 = MAX;
+     P1DC3 = MIN;
+   }
+}
