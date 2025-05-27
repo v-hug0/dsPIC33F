@@ -79,20 +79,45 @@ _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
 //#define MAX 18998
 //#define MIN 999
 
+uint16_t adcValue;
+
 // Prototipo de funcoes
 void PLL_Init(void);
 void GPIO_Init(void);
+void TIMER_Init(void);
+void AD_Init(void);
+int ADC_start(void);
 void MCPWM_Init(void);
-void setRGB(void);
+void setRGB(int adc);
 unsigned int i;
 
 int main(void) {
     PLL_Init();
     GPIO_Init();
     MCPWM_Init();
-            
+    AD_Init();   
     while (1) { 
-        setRGB();
+        AD1CON1bits.ADON = 1; // Turn ADC ON
+        AD1CON1bits.SAMP = 1; // starts sampling
+        for(int i = 0; i < 100; i++);
+        AD1CON1bits.SAMP = 0; // start converting
+        while (!AD1CON1bits.DONE);
+        adcValue = ADC1BUF0;
+        if(adcValue < 204){              // VERMELHO
+          P1DC1 = MAX;
+          P1DC2 = MIN;
+          P1DC3 = MIN;
+        }
+        else if((adcValue > 204) && (adcValue < 612)){    // AMARELO
+          P1DC1 = MAX;
+          P1DC2 = MAX;
+          P1DC3 = MIN;
+        }  
+        else if(adcValue >= 612 ){     // VERDE
+          P1DC1 = MIN;
+          P1DC2 = MAX;
+          P1DC3 = MIN;
+        }
     }
     return 0;
 }
@@ -112,8 +137,9 @@ void GPIO_Init(void)
     TRISBbits.TRISB1 = 1;
     TRISBbits.TRISB2 = 1;
     TRISBbits.TRISB3 = 1;
-    // Desabilita analogico
+    // Habilita o analógico apenas em RB0
     AD1PCFGL = 0xFFFF;
+    AD1PCFGLbits.PCFG0 = 0;
     // Modo de saida do LED
     TRISBbits.TRISB10 = 0; 
     TRISBbits.TRISB12 = 0;
@@ -140,26 +166,14 @@ void MCPWM_Init(void)
     P1TCONbits.PTEN = 1;
 }
 
-void setRGB()
+void AD_Init(void)
 {
-   if(B1){          // AMARELO
-     P1DC1 = MAX;
-     P1DC2 = MAX;
-     P1DC3 = MIN;
-   }  
-   else if(B2){     // VERDE
-     P1DC1 = MIN;
-     P1DC2 = MAX;
-     P1DC3 = MIN;
-   }
-   else if(B3){     // AZUL
-     P1DC1 = MIN;
-     P1DC2 = MIN;
-     P1DC3 = MAX;
-   }
-   else if(B4){     // BRANCO
-     P1DC1 = MAX;
-     P1DC2 = MAX;
-     P1DC3 = MAX;
-   }
+    AD1CON1 = 0x0000;   // SAMP bit = 0 ends sampling
+                        // and starts converting
+    AD1CHS0 = 0x0002;   // Connect RB2/AN2 as CH0 input
+    AD1CSSL = 0;        
+    AD1CON3 = 0x0002;   // Manual sample, Tad = internal 2 Tcy
+    AD1CON2 = 0;        
+    
 }
+

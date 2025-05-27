@@ -63,19 +63,19 @@ Default Scalar Model: Small
 section                    address   length (PC units)   length (bytes) (dec)
 -------                    -------   -----------------   --------------------
 .text                        0x200                0xce           0x135  (309)
-.text                        0x2ce                0xd2           0x13b  (315)
-.dinit                       0x3a0                 0x8             0xc  (12)
+.text                        0x2ce                0xfc           0x17a  (378)
+.dinit                       0x3ca                 0x8             0xc  (12)
 
-                 Total "program" memory used (bytes):          0x27c  (636) 5%
+                 Total "program" memory used (bytes):          0x2bb  (699) 6%
 
 
 "data" Memory  [Origin = 0x800, Length = 0x400]
 
 section                    address      alignment gaps    total length  (dec)
 -------                    -------      --------------    -------------------
-.nbss                        0x800                   0             0x2  (2)
+.nbss                        0x800                   0             0x4  (4)
 
-                 Total "data" memory used (bytes):            0x2  (2) <1%
+                 Total "data" memory used (bytes):            0x4  (4) <1%
 
 
 Dynamic Memory Usage
@@ -83,46 +83,48 @@ Dynamic Memory Usage
 region                     address                      maximum length  (dec)
 ------                     -------                      ---------------------
 heap                             0                                   0  (0)
-stack                        0x802                               0x3fe  (1022)
+stack                        0x804                               0x3fc  (1020)
 
-                 Maximum dynamic memory (bytes):          0x3fe  (1022)
+                 Maximum dynamic memory (bytes):          0x3fc  (1020)
 
 Info: Project is using a large data memory model when small data memory model is sufficient.
 
 
 External Symbols in Data Memory (by address):
 
-                    0x0800                  _i
+                    0x0800                  _adcValue
+                    0x0802                  _i
 
 External Symbols in Data Memory (by name):
 
-                    0x0800                  _i
+                    0x0800                  _adcValue
+                    0x0802                  _i
 
 External Symbols in Program Memory (by address):
 
                   0x000200                  __resetPRI
                   0x00023c                  __psv_init
-                  0x000252                  __data_init_standard
                   0x000252                  __data_init
+                  0x000252                  __data_init_standard
                   0x0002c8                  __DefaultInterrupt
                   0x0002ce                  _main
-                  0x0002da                  _PLL_Init
-                  0x000302                  _GPIO_Init
-                  0x00031a                  _MCPWM_Init
-                  0x000344                  _setRGB
+                  0x00034a                  _PLL_Init
+                  0x000372                  _GPIO_Init
+                  0x00038c                  _MCPWM_Init
+                  0x0003b6                  _AD_Init
 
 External Symbols in Program Memory (by name):
 
-                  0x000302                  _GPIO_Init
-                  0x00031a                  _MCPWM_Init
-                  0x0002da                  _PLL_Init
+                  0x0003b6                  _AD_Init
+                  0x000372                  _GPIO_Init
+                  0x00038c                  _MCPWM_Init
+                  0x00034a                  _PLL_Init
                   0x0002c8                  __DefaultInterrupt
                   0x000252                  __data_init
                   0x000252                  __data_init_standard
                   0x00023c                  __psv_init
                   0x000200                  __resetPRI
                   0x0002ce                  _main
-                  0x000344                  _setRGB
 
 Memory Configuration
 
@@ -243,26 +245,26 @@ __FUID3
 .comment
  *(.comment)
 
-.debug_info       0x000000        0xc29
+.debug_info       0x000000        0xe1e
  *(.debug_info)
- .debug_info      0x000000        0xc29 build/default/production/main.o
+ .debug_info      0x000000        0xe1e build/default/production/main.o
  *(.gnu.linkonce.wi.*)
 
-.debug_abbrev     0x000000         0xfe
+.debug_abbrev     0x000000        0x13a
  *(.debug_abbrev)
- .debug_abbrev    0x000000         0xfe build/default/production/main.o
+ .debug_abbrev    0x000000        0x13a build/default/production/main.o
 
-.debug_line       0x000000        0x110
+.debug_line       0x000000        0x123
  *(.debug_line)
- .debug_line      0x000000        0x110 build/default/production/main.o
+ .debug_line      0x000000        0x123 build/default/production/main.o
 
 .debug_frame      0x000000         0x96
  *(.debug_frame)
  .debug_frame     0x000000         0x96 build/default/production/main.o
 
-.debug_str        0x000000         0x4b
+.debug_str        0x000000         0x6c
  *(.debug_str)
- .debug_str       0x000000         0x4b build/default/production/main.o
+ .debug_str       0x000000         0x6c build/default/production/main.o
 
 .debug_loc
  *(.debug_loc)
@@ -271,10 +273,10 @@ __FUID3
  *(.debug_macinfo)
 
 .debug_pubnames
-                  0x000000         0x6d
+                  0x000000         0x7b
  *(.debug_pubnames)
  .debug_pubnames
-                  0x000000         0x6d build/default/production/main.o
+                  0x000000         0x7b build/default/production/main.o
 
 .debug_ranges
  *(.debug_ranges)
@@ -921,30 +923,31 @@ LOAD default_isr
 LOAD data_init
 
 .debug_pubtypes
-                  0x000018         0xe5
+                  0x000018        0x10e
  .debug_pubtypes
-                  0x000018         0xe5 build/default/production/main.o
+                  0x000018        0x10e build/default/production/main.o
 
 __c30_signature
-                  0x0000fd         0x12
+                  0x000126         0x12
  __c30_signature
-                  0x0000fd          0x6 build/default/production/main.o
+                  0x000126          0x6 build/default/production/main.o
  __c30_signature
-                  0x000103          0x6 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(crt0_standard.o)
+                  0x00012c          0x6 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(crt0_standard.o)
  __c30_signature
-                  0x000109          0x6 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(data_init_standard.o)
+                  0x000132          0x6 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(data_init_standard.o)
 
-.nbss               0x0800          0x2
- .nbss              0x0800          0x2 build/default/production/main.o
-                    0x0800                  _i
+.nbss               0x0800          0x4
+ .nbss              0x0800          0x4 build/default/production/main.o
+                    0x0800                  _adcValue
+                    0x0802                  _i
 
-.text             0x0002ce         0xd2
- .text            0x0002ce         0xd2 build/default/production/main.o
+.text             0x0002ce         0xfc
+ .text            0x0002ce         0xfc build/default/production/main.o
                   0x0002ce                  _main
-                  0x0002da                  _PLL_Init
-                  0x000302                  _GPIO_Init
-                  0x00031a                  _MCPWM_Init
-                  0x000344                  _setRGB
+                  0x00034a                  _PLL_Init
+                  0x000372                  _GPIO_Init
+                  0x00038c                  _MCPWM_Init
+                  0x0003b6                  _AD_Init
 
-.dinit            0x0003a0          0x8
- .dinit           0x0003a0          0x8 data_init
+.dinit            0x0003ca          0x8
+ .dinit           0x0003ca          0x8 data_init
