@@ -67,17 +67,23 @@ _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
 #define PRESCALER 1
 #define PERIOD (FCY/(FPWM*PRESCALER)-1) 
 #define DUTY_CYCLE(percent) ((uint16_t)((2 * PERIOD * (percent)) / 100))
+#define MAX DUTY_CYCLE(95)
+#define MIN DUTY_CYCLE(5)
 
-#define MAX DUTY_CYCLE(95)  // 19998
-#define MIN DUTY_CYCLE(5)   // 999 
+#define ADC_RESOLUTION 1023
+#define VREF           5
+#define VOLT_TO_ADC(voltage) ((uint16_t)((voltage)*ADC_RESOLUTION / VREF))
+
+#define RED_TO_YELLOW   1
+#define YELLOW_TO_GREEN 3
+
+#define RED_THS VOLT_TO_ADC(RED_TO_YELLOW)
+#define YEL_THS VOLT_TO_ADC(YELLOW_TO_GREEN)
 
 #define B1 PORTBbits.RB0
 #define B2 PORTBbits.RB1
 #define B3 PORTBbits.RB2
 #define B4 PORTBbits.RB3
-
-//#define MAX 18998
-//#define MIN 999
 
 uint16_t adcValue;
 
@@ -118,7 +124,7 @@ void GPIO_Init(void)
     TRISBbits.TRISB1 = 1;
     TRISBbits.TRISB2 = 1;
     TRISBbits.TRISB3 = 1;
-    // Habilita o analógico apenas em RB0
+    // Habilita o analï¿½gico apenas em RB0
     AD1PCFGL = 0xFFFF;
     AD1PCFGLbits.PCFG0 = 0;
     // Modo de saida do LED
@@ -153,7 +159,7 @@ void AD_Init(void)
                         // and starts converting
     AD1CHS0 = 0x0002;   // Connect RB2/AN2 as CH0 input
     AD1CSSL = 0;        
-    AD1CON3 = 0x0002;   // Manual sample, Tad = internal 2 Tcy
+    AD1CON3 = 0x0002;   // Manual sample, Tad = internal 3 Tcy
     AD1CON2 = 0;        
     
 }
@@ -172,17 +178,17 @@ int ADC_start(void)
 
 void setRGB(int adc)
 {
-   if(adc <= 205){              // VERMELHO
+   if(adc <= RED_THS){              // VERMELHO
      P1DC1 = MAX;
      P1DC2 = MIN;
      P1DC3 = MIN;
    }
-   else if((adc > 205) && (adc < 612)){    // AMARELO
+   else if((adc > RED_THS) && (adc < YEL_THS)){    // AMARELO
      P1DC1 = MAX;
      P1DC2 = MAX;
      P1DC3 = MIN;
    }  
-   else if(adc >= 612 ){     // VERDE
+   else if(adc >= YEL_THS ){     // VERDE
      P1DC1 = MIN;
      P1DC2 = MAX;
      P1DC3 = MIN;
