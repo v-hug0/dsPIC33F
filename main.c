@@ -67,23 +67,15 @@ _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
 #define PRESCALER 1
 #define PERIOD (FCY/(FPWM*PRESCALER)-1) 
 #define DUTY_CYCLE(percent) ((uint16_t)((2 * PERIOD * (percent)) / 100))
-#define MAX DUTY_CYCLE(95)
-#define MIN DUTY_CYCLE(5)
 
 #define ADC_RESOLUTION 1023
-#define VREF           5
-#define VOLT_TO_ADC(voltage) ((uint16_t)((voltage)*ADC_RESOLUTION / VREF))
 
-#define RED_TO_YELLOW   1
-#define YELLOW_TO_GREEN 3
+#define MAX DUTY_CYCLE(100)
+#define MIN DUTY_CYCLE(0)
+#define ADC_TO_DUTY(adc_val) ((uint16_t)(((uint32_t)(adc_val) * MAX) / ADC_RESOLUTION))
 
-#define RED_THS VOLT_TO_ADC(RED_TO_YELLOW)
-#define YEL_THS VOLT_TO_ADC(YELLOW_TO_GREEN)
-
-#define B1 PORTBbits.RB0
-#define B2 PORTBbits.RB1
-#define B3 PORTBbits.RB2
-#define B4 PORTBbits.RB3
+#define POT PORTBbits.RB0
+#define BRAKE_BUTTON PORTBbits.RB4
 
 uint16_t adcValue;
 
@@ -94,7 +86,8 @@ void TIMER_Init(void);
 void AD_Init(void);
 int ADC_start(void);
 void MCPWM_Init(void);
-void setRGB(int adc);
+void motorRun(uint16_t speed);
+void motorBrake(void);
 unsigned int i;
 
 int main(void) {
@@ -104,7 +97,11 @@ int main(void) {
     AD_Init();   
     while (1) { 
         adcValue = ADC_start();
-        setRGB(adcValue);
+        if(BRAKE_BUTTON==0){
+            motorRun(adcValue);
+        } else{
+            motorBrake();
+        } 
     }
     return 0;
 }
@@ -119,16 +116,13 @@ void PLL_Init(void)
 
 void GPIO_Init(void)
 {
-    // Modo de entrada dos botoes
+    // Modo de entrada do potenciometro e dos botoes
     TRISBbits.TRISB0 = 1;
-    TRISBbits.TRISB1 = 1;
-    TRISBbits.TRISB2 = 1;
-    TRISBbits.TRISB3 = 1;
+    TRISBbits.TRISB4 = 1;
     // Habilita o anal�gico apenas em RB0
     AD1PCFGL = 0xFFFF;
     AD1PCFGLbits.PCFG0 = 0;
-    // Modo de saida do LED
-    TRISBbits.TRISB10 = 0; 
+    // Modo de saida do LED 
     TRISBbits.TRISB12 = 0;
     TRISBbits.TRISB14 = 0;
 };
@@ -144,11 +138,9 @@ void MCPWM_Init(void)
     // Habilitar o perif�rico no pino I/O
     PWM1CON1bits.PEN1H = 1;
     PWM1CON1bits.PEN2H = 1;
-    PWM1CON1bits.PEN3H = 1;
     // Modo independente
     PWM1CON1bits.PMOD1 = 1;
     PWM1CON1bits.PMOD2 = 1;
-    PWM1CON1bits.PMOD3 = 1;
     
     P1TCONbits.PTEN = 1;
 }
@@ -176,21 +168,15 @@ int ADC_start(void)
     return adc;
 }
 
-void setRGB(int adc)
+void motorRun(uint16_t speed)
 {
-   if(adc <= RED_THS){              // VERMELHO
-     P1DC1 = MAX;
-     P1DC2 = MIN;
-     P1DC3 = MIN;
-   }
-   else if((adc > RED_THS) && (adc < YEL_THS)){    // AMARELO
-     P1DC1 = MAX;
-     P1DC2 = MAX;
-     P1DC3 = MIN;
-   }  
-   else if(adc >= YEL_THS ){     // VERDE
-     P1DC1 = MIN;
-     P1DC2 = MAX;
-     P1DC3 = MIN;
-   }
+    uint16_t duty = ADC_TO_DUTY(speed);
+    P1DC1 = duty;
+    P1DC2 = MIN;
 }
+
+void motorBrake(void){
+    P1DC1 = MAX;
+    P1DC2 = MAX;
+}
+
