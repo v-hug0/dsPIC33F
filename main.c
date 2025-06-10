@@ -1,16 +1,16 @@
 /*
  * Projeto 01 - Controle de Velocidade de Motor DC
  * 
- * Descrição:
- * - Utiliza um potenciômetro conectado em AN0 (RB0) para ajustar o duty cycle do PWM
+ * Descriï¿½ï¿½o:
+ * - Utiliza um potenciï¿½metro conectado em AN0 (RB0) para ajustar o duty cycle do PWM
  * - PWM controla a velocidade de um motor DC
- * - Inclui um botão em RB4 para simular a função de freio
- * - Quando solto, retorna ao controle pelo potenciômetro
+ * - Inclui um botï¿½o em RB4 para simular a funï¿½ï¿½o de freio
+ * - Quando solto, retorna ao controle pelo potenciï¿½metro
  * 
- * Configurações:
+ * Configuraï¿½ï¿½es:
  * - Clock do sistema: 40MHz (FRCPLL com M=43, N1=2, N2=2)
- * - Frequência PWM: 4kHz
- * - Resolução ADC: 10 bits (0-1023)
+ * - Frequï¿½ncia PWM: 4kHz
+ * - Resoluï¿½ï¿½o ADC: 10 bits (0-1023)
  */
 
 #include "xc.h"
@@ -70,53 +70,67 @@ _FOSCSEL(FNOSC_FRCPLL);
 // Enable Clock Switching and Configure Primary Oscillator in XT mode
 _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
 
-#define FCY 40000000
-#define FPWM 4000
-#define PRESCALER 1
-#define PERIOD (FCY/(FPWM*PRESCALER)-1) 
-// Calcula o valor do duty cycle
-#define DUTY_CYCLE(percent) ((uint16_t)((2 * PERIOD * (percent)) / 100)) 
-
 #define ADC_RESOLUTION 1023
+#define VREF           5
+#define SHUNT_RES      0.1
 
-#define MAX DUTY_CYCLE(100)
-#define MIN DUTY_CYCLE(0)
-// Converte valor ADC para duty cycle
-#define ADC_TO_DUTY(adc_val) ((uint16_t)(((uint32_t)(adc_val) * MAX) / ADC_RESOLUTION))
+uint16_t adcCurrent; // Variï¿½vel para armazenar o valor lido do ADC
+uint16_t adcVoltage;
 
-// Definição dos pinos
-#define POT PORTBbits.RB0       // Potenciômetro conectado em RB0/AN0
-#define BRAKE_BUTTON PORTBbits.RB4 // Botão de freio conectado em RB4
+#define FCY 40000000
+#define BAUDRATE 9600
+#define BRGVAL ((FCY/BAUDRATE)/16)-1 // Low speed mode
+
+#define _UART_BUFF_SIZE 128
+typedef struct{
+    char buff[_UART_BUFF_SIZE];
+    volatile uint16_t length;
+    volatile uint16_t index;
+    volatile uint8_t busy:2;
+}UARTHandler;
+
+UARTHandler huart1;
 
 
-uint16_t adcValue; // Variável para armazenar o valor lido do ADC
-
-// Protótipos de funções
+// Protï¿½tipos de funï¿½ï¿½es
 void PLL_Init(void);      // Configura o PLL para gerar 40MHz
 void GPIO_Init(void);     // Configura os pinos de I/O
-void TIMER_Init(void);    // Configura temporizador (não usado neste código)
-void AD_Init(void);       // Configura o módulo ADC
-int ADC_start(void);      // Inicia conversão ADC e retorna valor
-void MCPWM_Init(void);    // Configura o módulo PWM
-void motorRun(uint16_t speed); // Controla o motor com velocidade variável
-void motorBrake(void);    // Aciona o freio do motor
+void AD_Init(void);       // Configura o mï¿½dulo ADC
+uint16_t ADC_Read(uint8_t channel);      // Inicia conversï¿½o ADC e retorna valor
+void UART_TX_Init(void);
+uint8_t sendString(char* str, UARTHandler* handler);
+float getCurrent(uint16_t current);
+float getVoltage(uint16_t voltage);
+void sendMeasurements(float current, float voltage);
 unsigned int i;
 
 int main(void) {
     PLL_Init();
     GPIO_Init();
-    MCPWM_Init();
     AD_Init();   
+    UART_Init();
+    
     while (1) { 
-        adcValue = ADC_start();
-        if(BRAKE_BUTTON==0){
-            motorRun(adcValue);
-        } else{
-            motorBrake();
-        } 
+        sendString("teste\n",&huart1);
+        //adcCurrent = ADC_Read(0);
+        //adcVoltage = ADC_Read(1);
+        //float current = getCurrent(adcCurrent);
+        //float voltage = getVoltage(adcVoltage);
+        //sendMeasurements(150, 150);
+        
     }
     return 0;
 }
+
+ void __attribute__((__interrupt__, no_auto_psv)) _U1TXInterrupt(void)
+ {
+    IFS0bits.U1TXIF = 0; // clear TX interrupt flag
+    if (huart1.index < huart1.length) {
+        U1TXREG = huart1.buff[huart1.index++];
+    } else {
+        huart1.busy = 0;
+    }
+ }
 
 void PLL_Init(void)
 {
@@ -128,50 +142,31 @@ void PLL_Init(void)
 
 void GPIO_Init(void)
 {
-    // Modo de entrada do potenciometro e dos botoes
-    TRISBbits.TRISB0 = 1;
-    TRISBbits.TRISB4 = 1;
-    // Habilita o analï¿½gico apenas em RB0
+    TRISBbits.TRISB3 = 0;
+    // Habilita o analï¿½gico apenas em AN0 e AN1
     AD1PCFGL = 0xFFFF;
     AD1PCFGLbits.PCFG0 = 0;
+    AD1PCFGLbits.PCFG1 = 0;
     // Modo de saida do LED 
-    TRISBbits.TRISB12 = 0;
-    TRISBbits.TRISB14 = 0;
+    TRISAbits.TRISA0 = 1;
+    TRISAbits.TRISA1 = 1;
 };
-
-void MCPWM_Init(void)
-{
-    // Base de tempo
-    P1TCONbits.PTEN = 0;        
-    P1TCONbits.PTMOD = 0b00;    // modo free run (dente de serra) - edge al
-    P1TCONbits.PTCKPS = 0b00;   // prescaler 1:1        
-    // Periodo do PWM
-    P1TPER = PERIOD;
-    // Habilitar o periferico no pino I/O
-    PWM1CON1bits.PEN1H = 1;
-    PWM1CON1bits.PEN2H = 1;
-    // Modo independente
-    PWM1CON1bits.PMOD1 = 1;
-    PWM1CON1bits.PMOD2 = 1;
-    
-    P1TCONbits.PTEN = 1;
-}
 
 void AD_Init(void)
 {
     AD1CON1 = 0x0000;   // SAMP bit = 0 ends sampling
                         // and starts converting
-    AD1CHS0 = 0x0002;   // Connect RB2/AN2 as CH0 input
     AD1CSSL = 0;        
+    AD1CON2 = 0;        // Voltage reference to Avdd e Avss
     AD1CON3 = 0x0002;   // Manual sample, Tad = internal 3 Tcy
-    AD1CON2 = 0;        
     
 }
 
-int ADC_start(void)
+uint16_t ADC_Read(uint8_t channel)
 {
     int adc = 0;
     AD1CON1bits.ADON = 1; // Turn ADC ON
+    AD1CHS0bits.CH0SA = channel;
     AD1CON1bits.SAMP = 1; // starts sampling
     for(int i = 0; i < 100; i++);
     AD1CON1bits.SAMP = 0; // start converting
@@ -180,15 +175,73 @@ int ADC_start(void)
     return adc;
 }
 
-void motorRun(uint16_t speed)
+void UART_Init(void)
 {
-    uint16_t duty = ADC_TO_DUTY(speed);
-    P1DC1 = duty;
-    P1DC2 = MIN;
+    U1MODEbits.STSEL    = 0;        // 1-stop bit
+    U1MODEbits.PDSEL    = 0;        // No Parity, 8-data bits
+    U1MODEbits.ABAUD    = 0;        // Auto-Baud Disabled
+    U1MODEbits.BRGH     = 0;        // Low Speed mode
+    U1BRG = BRGVAL;                 // BAUD Rate Setting for 9600
+    UART_TX_Init();
+    //UART_RX_Init();
+    //while(1);
+    
 }
 
-void motorBrake(void){
-    P1DC1 = MAX;
-    P1DC2 = MAX;
+void UART_TX_Init(void)
+{
+    U1STAbits.UTXISEL0  = 0;        // Interrupt after one Tx character is 
+    // transmitted
+    U1STAbits.UTXISEL1  = 0;
+    IEC0bits.U1TXIE     = 1;        // Enable UART Tx interrupt
+    U1MODEbits.UARTEN   = 1;        // Enable UART
+    U1STAbits.UTXEN     = 1;        // Enable UART Tx
+    TRISBbits.TRISB3    = 0;        // TX in RP3
+    RPOR1 = 0x0300;
 }
 
+
+uint8_t sendString(char* str, UARTHandler* handler)
+{
+    // Return if UART is currently busy
+    if (handler->busy) return 0;
+    // Get string length
+    uint16_t len = strlen(str);
+    if (len == 0 || len >= _UART_BUFF_SIZE) return 0;
+    // Safe copy to buffer, with boundary check
+    for (uint16_t i = 0; i < len; i++) {
+        handler->buff[i] = str[i];
+    }
+    handler->length = len;
+    handler->index = 1;
+    handler->busy = 1;
+    // Start transmission by writing first character to UART
+    U1TXREG = handler->buff[0];
+    return 1;
+}
+
+float getCurrent(uint16_t current) {
+    // Converter valor ADC para tensÃ£o no shunt
+    float voltageShunt = (current * VREF) / ADC_RESOLUTION;
+    // Calcular corrente usando Lei de Ohm (I = V/R)
+    // Considerando amplificaÃ§Ã£o se houver (nÃ£o mencionado no circuito)
+    return voltageShunt / SHUNT_RES;
+}
+
+float getVoltage(uint16_t voltage) {
+    // Converter valor ADC para tensÃ£o medida
+    float measuredVoltage = (voltage * VREF) / ADC_RESOLUTION;
+    
+    // Calcular tensÃ£o real considerando divisor de tensÃ£o
+    // Ajuste esta fÃ³rmula conforme seu circuito real
+    return measuredVoltage;
+}
+
+void sendMeasurements(float current, float voltage) {
+    char buffer[128];
+    // Formatando os valores com 2 casas decimais
+    snprintf(buffer, sizeof(buffer), 
+             "Corrente: %.2f A, Tensao: %.2f V\r\n", 
+             current, voltage);
+    sendString(buffer, &huart1);
+}
