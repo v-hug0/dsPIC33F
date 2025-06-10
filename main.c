@@ -1,8 +1,16 @@
 /*
- * File:   main.c
- * Author: Victor
- *
- * Created on 11 de Abril de 2025, 18:02
+ * Projeto 01 - Controle de Velocidade de Motor DC
+ * 
+ * Descrição:
+ * - Utiliza um potenciômetro conectado em AN0 (RB0) para ajustar o duty cycle do PWM
+ * - PWM controla a velocidade de um motor DC
+ * - Inclui um botão em RB4 para simular a função de freio
+ * - Quando solto, retorna ao controle pelo potenciômetro
+ * 
+ * Configurações:
+ * - Clock do sistema: 40MHz (FRCPLL com M=43, N1=2, N2=2)
+ * - Frequência PWM: 4kHz
+ * - Resolução ADC: 10 bits (0-1023)
  */
 
 #include "xc.h"
@@ -66,28 +74,32 @@ _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
 #define FPWM 4000
 #define PRESCALER 1
 #define PERIOD (FCY/(FPWM*PRESCALER)-1) 
-#define DUTY_CYCLE(percent) ((uint16_t)((2 * PERIOD * (percent)) / 100))
+// Calcula o valor do duty cycle
+#define DUTY_CYCLE(percent) ((uint16_t)((2 * PERIOD * (percent)) / 100)) 
 
 #define ADC_RESOLUTION 1023
 
 #define MAX DUTY_CYCLE(100)
 #define MIN DUTY_CYCLE(0)
+// Converte valor ADC para duty cycle
 #define ADC_TO_DUTY(adc_val) ((uint16_t)(((uint32_t)(adc_val) * MAX) / ADC_RESOLUTION))
 
-#define POT PORTBbits.RB0
-#define BRAKE_BUTTON PORTBbits.RB4
+// Definição dos pinos
+#define POT PORTBbits.RB0       // Potenciômetro conectado em RB0/AN0
+#define BRAKE_BUTTON PORTBbits.RB4 // Botão de freio conectado em RB4
 
-uint16_t adcValue;
 
-// Prototipo de funcoes
-void PLL_Init(void);
-void GPIO_Init(void);
-void TIMER_Init(void);
-void AD_Init(void);
-int ADC_start(void);
-void MCPWM_Init(void);
-void motorRun(uint16_t speed);
-void motorBrake(void);
+uint16_t adcValue; // Variável para armazenar o valor lido do ADC
+
+// Protótipos de funções
+void PLL_Init(void);      // Configura o PLL para gerar 40MHz
+void GPIO_Init(void);     // Configura os pinos de I/O
+void TIMER_Init(void);    // Configura temporizador (não usado neste código)
+void AD_Init(void);       // Configura o módulo ADC
+int ADC_start(void);      // Inicia conversão ADC e retorna valor
+void MCPWM_Init(void);    // Configura o módulo PWM
+void motorRun(uint16_t speed); // Controla o motor com velocidade variável
+void motorBrake(void);    // Aciona o freio do motor
 unsigned int i;
 
 int main(void) {
@@ -135,7 +147,7 @@ void MCPWM_Init(void)
     P1TCONbits.PTCKPS = 0b00;   // prescaler 1:1        
     // Periodo do PWM
     P1TPER = PERIOD;
-    // Habilitar o perifï¿½rico no pino I/O
+    // Habilitar o periferico no pino I/O
     PWM1CON1bits.PEN1H = 1;
     PWM1CON1bits.PEN2H = 1;
     // Modo independente
