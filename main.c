@@ -84,10 +84,12 @@ _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
 
 uint16_t TEMPERATURE;
 uint16_t LIGHT;
+uint8_t EMERGENCY = 0;
 
 // Prototipo de funcoes
 void PLL_Init(void);
 void GPIO_Init(void);
+void INT0_Init(void);
 void AD_Init(void);
 int ADC_Read(uint8_t channel);
 void MCPWM_Init(void);
@@ -98,16 +100,28 @@ unsigned int i;
 int main(void) {
     PLL_Init();
     GPIO_Init();
+    INT0_Init();
     MCPWM_Init();
     AD_Init();   
     while (1) { 
+      if (!EMERGENCY) {
         TEMPERATURE = ADC_Read(CH_LM35);
-        runFAN(TEMPERATURE);
-        
         LIGHT = ADC_Read(CH_LDR);
+        runFAN(TEMPERATURE);
         setLIGHT(LIGHT);
+      }
+      else{
+        runFAN(0);
+        setLIGHT(0);
+      }
     }
     return 0;
+}
+
+void __attribute__((interrupt, auto_psv)) _INT0Interrupt(void)
+{
+    EMERGENCY = !EMERGENCY;
+    IFS0bits.INT0IF = 0; // Limpa a flag de interrupção
 }
 
 void PLL_Init(void)
@@ -130,6 +144,8 @@ void GPIO_Init(void)
     
     TRISBbits.TRISB12 = 0;        // H2 (LIGHT)
     TRISBbits.TRISB14 = 0;        // H1 (FAN)
+    
+    TRISBbits.TRISB7 = 1;         // RB7 como entrada (INT0)
 };
 
 void MCPWM_Init(void)
@@ -183,3 +199,11 @@ void setLIGHT(uint16_t LDR)
     uint16_t duty = ADC_TO_DUTY(LDR);
     P1DC2 = duty;
 }
+
+void INT0_Init(void)
+{
+    INTCON2bits.INT0EP = 1;    // Interrupção na borda de DESCIDA (pressionar botão)
+    IFS0bits.INT0IF = 0;       // Limpa a flag da interrupção
+    IEC0bits.INT0IE = 1;       // Habilita a interrupção externa INT0
+}
+
