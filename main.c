@@ -68,23 +68,31 @@ _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
 #define PERIOD (FCY/(FPWM*PRESCALER)-1) 
 #define DUTY_CYCLE(percent) ((uint16_t)((2 * PERIOD * (percent)) / 100))
 
+#define ADC_RESOLUTION 1023
+
 #define MAX DUTY_CYCLE(100)  // 19998
 #define MIN DUTY_CYCLE(0)   // 999 
+
+#define ADC_TO_DUTY(adc_val) ((uint16_t)(((uint32_t)(adc_val) * MAX) / ADC_RESOLUTION))
+
+#define CH_LM35 2
+#define CH_LDR  3
+
 
 //#define MAX 18998
 //#define MIN 999
 
-uint16_t temp;
-uint16_t luz;
+uint16_t TEMPERATURE;
+uint16_t LIGHT;
 
 // Prototipo de funcoes
 void PLL_Init(void);
 void GPIO_Init(void);
-void TIMER_Init(void);
 void AD_Init(void);
 int ADC_Read(uint8_t channel);
 void MCPWM_Init(void);
-void CONTROL(uint16_t temp, uint16_t luz);
+void runFAN(uint16_t LM35);
+void setLIGHT(uint16_t LDR);
 unsigned int i;
 
 int main(void) {
@@ -93,9 +101,11 @@ int main(void) {
     MCPWM_Init();
     AD_Init();   
     while (1) { 
-        temp = ADC_Read(0);
-        luz = ADC_Read(1);
-        CONTROL(luz, temp);
+        TEMPERATURE = ADC_Read(CH_LM35);
+        runFAN(TEMPERATURE);
+        
+        LIGHT = ADC_Read(CH_LDR);
+        setLIGHT(LIGHT);
     }
     return 0;
 }
@@ -111,15 +121,15 @@ void PLL_Init(void)
 void GPIO_Init(void)
 {
     AD1PCFGL = 0xFFFF;            // Todos os pinos como digitais inicialmente
-    AD1PCFGLbits.PCFG0 = 0;       // AN0 analógico
-    AD1PCFGLbits.PCFG1 = 0;       // AN1 analógico
-    TRISAbits.TRISA0 = 1;         // RA0 como entrada (corrente)
-    TRISAbits.TRISA1 = 1;         // RA1 como entrada (tensão)
+    AD1PCFGLbits.PCFG2 = 0;       // AN2 analógico
+    AD1PCFGLbits.PCFG3 = 0;       // AN3 analógico
     
-    TRISBbits.TRISB12 = 0;  // H2
-    TRISBbits.TRISB14 = 0;  // H1
+    TRISBbits.TRISB0 = 1;         // RB0 como entrada (LM35)
+    TRISBbits.TRISB1 = 1;         // RB1 como entrada (LDR)
     
-        
+    
+    TRISBbits.TRISB12 = 0;        // H2 (LIGHT)
+    TRISBbits.TRISB14 = 0;        // H1 (FAN)
 };
 
 void MCPWM_Init(void)
@@ -130,13 +140,13 @@ void MCPWM_Init(void)
     P1TCONbits.PTCKPS = 0b00;   // prescaler 1:1        
     // Periodo do PWM
     P1TPER = PERIOD;
-    // Habilitar o perifï¿½rico no pino I/O
+    // Habilitar o periferico no pino I/O
     PWM1CON1bits.PEN1H = 1;
     PWM1CON1bits.PEN2H = 1;
     // Modo independente
     PWM1CON1bits.PMOD1 = 1;
     PWM1CON1bits.PMOD2 = 1;
-
+    
     P1TCONbits.PTEN = 1;
 }
 
@@ -161,35 +171,15 @@ int ADC_Read(uint8_t channel)
     return ADC1BUF0;                   // Retorna valor convertido
 }
 
-void CONTROL(uint16_t temp, uint16_t luz){
-//   if((temp > 200) && (temp < 400)){    // AMARELO
-//     P1DC1 = DUTY_CYCLE(40);
-//   }  
-//   else if((temp > 400) && (temp < 600)){    // AMARELO
-//     P1DC1 = DUTY_CYCLE(60);
-//   }  
-//   else if((temp > 600) && (temp < 800)){    // AMARELO
-//     P1DC1 = DUTY_CYCLE(80);
-//   }  
-//   else if((temp > 800)){    // AMARELO
-//     P1DC1 = DUTY_CYCLE(100);
-//   }  
-    
-   if(luz <= 200){              // VERMELHO
-     P1DC2 = DUTY_CYCLE(100);;
-   }
-   else if((luz > 200) && (luz < 400)){    // AMARELO
-     P1DC2 = DUTY_CYCLE(80);;
-   }  
-   else if((luz > 400) && (luz < 600)){    // AMARELO
-     P1DC2 = DUTY_CYCLE(60);;
-   }  
-   else if((luz > 600) && (luz < 800)){    // AMARELO
-     P1DC2 = DUTY_CYCLE(40);;
-   }  
-   else if((luz > 800)){    // AMARELO
-     P1DC2 = DUTY_CYCLE(20);;
-   }   
-    
-    
+void runFAN(uint16_t LM35)
+{
+    uint16_t duty = ADC_TO_DUTY(LM35);
+    P1DC1 = duty;
+}
+
+
+void setLIGHT(uint16_t LDR)
+{
+    uint16_t duty = ADC_TO_DUTY(LDR);
+    P1DC2 = duty;
 }
