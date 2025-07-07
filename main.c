@@ -45,154 +45,129 @@
  */
 
 // Configura FRC com PLL como oscilador
-_FOSCSEL(FNOSC_FRCPLL); 
+_FOSCSEL(FNOSC_PRI); 
 // Habilita mudanca de clock e configura oscilador
-_FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE);
+_FOSC(POSCMD_XT);
 
 // Definicoes de constantes
-#define FCY 40000000           // Frequencia do sistema (40 MHz)
-#define FPWM 4000              // Frequencia PWM desejada (4 kHz)
-#define PRESCALER 1            // Prescaler do PWM
-#define PERIOD (FCY/(FPWM*PRESCALER)-1)  // Calculo do periodo do PWM
-#define DUTY_CYCLE(percent) ((uint16_t)((2 * PERIOD * (percent)) / 100))  // Calculo do duty cycle
-
-#define ADC_RESOLUTION 1023    // Resolucao do ADC (10 bits)
-
-#define MAX DUTY_CYCLE(100)    // Valor maximo de duty cycle (100%)
-#define MIN DUTY_CYCLE(0)      // Valor minimo de duty cycle (0%)
-
-#define ADC_TO_DUTY(adc_val) ((uint16_t)(((uint32_t)(adc_val) * MAX) / ADC_RESOLUTION))  // Conversao ADC para duty cycle
-
-#define CH_LM35 2              // Canal ADC AN2 sensor LM35 (temperatura)
-#define CH_LDR  3              // Canal ADC AN3 para LDR (luminosidade)
+#define Fosc 10000000           // Frequencia do sistema (40 MHz)
+#define BAUDRATE 9600
+#define BRGVAL ((Fosc/2/BAUDRATE)/16)-1      // low speed mode
 
 // Variaveis globais
-uint16_t TEMPERATURE;          // Armazena leitura de temperatura
-uint16_t LIGHT;                // Armazena leitura de luminosidade
-uint8_t EMERGENCY = 0;         // Flag de emergencia
+int x = 0;
+int controle = 0b10100000; // 1010 -> memoria 000 -> end chip 0 -> R/W
+int endM = 0x00;
+int endL = 0x00;
+
+int length = 25;
+char Byte[] = {"Victor Hugo"};
+int i,z;
+
+void __attribute__((interrupt, shadow, no_auto_psv)) _INT0Interrupt(void)
+{
+    IFS0bits.INT0IF = 0;
+    U1TXREG = 0x00;
+    
+    I2C1CONbits.SEN = 1;
+    while(I2C1CONbits.SEN);
+    while(I2C1STATbits.TRSTAT);
+    I2C1TRN = controle;
+    while(I2C1STATbits.TRSTAT);
+    I2C1TRN = endM;
+    while(I2C1STATbits.TRSTAT);
+    I2C1TRN = 0x00;
+    while(I2C1STATbits.TRSTAT);
+    I2C1CONbits.RSEN = 1;           // Generate Restart
+    while(I2C1CONbits.RSEN);
+    while(I2C1STATbits.TRSTAT);
+    I2C1TRN = controle | 1;
+    while(I2C1STATbits.TBF);
+    for(i = 0; i < length; i++)
+    {
+        while(I2C1STATbits.TRSTAT);
+        I2C1CONbits.RCEN = 1;       // Enable Master Receive
+    Nop();
+    while(!I2C1STATbits.RBF);
+        U1TXREG = I2C1RCV;
+        for(z=0; z<450; z++);
+        if(i<(length-1))
+        {
+            while(I2C1STATbits.TRSTAT);
+            I2C1CONbits.ACKDT = 0;  // Set for ACK
+            I2C1CONbits.ACKEN = 1;
+        } else {
+        while(I2C1STATbits.TRSTAT);
+        I2C1CONbits.ACKDT = 1;      // Set for NotACK
+        I2C1CONbits.ACKEN = 1;
+        while(I2C1CONbits.ACKEN);   // Wait for ACK to complete
+        I2C1CONbits.ACKDT = 0;      // Set for NotACK
+        }
+    }
+
+    while(I2C1STATbits.TRSTAT);
+    I2C1CONbits.PEN = 1;            // Generate Stop Condition
+    while(I2C1CONbits.PEN);         // Wait for stop
+    LATBbits.LATB0 = !LATBbits.LATB0;
+    z++;
+}
 
 // Prototipos de funcoes
-void PLL_Init(void);           // Inicializa PLL
-void GPIO_Init(void);          // Configura GPIOs
-void INT0_Init(void);          // Configura interrupcao externa
-void AD_Init(void);            // Inicializa ADC
-int ADC_Read(uint8_t channel); // Le canal ADC
-void MCPWM_Init(void);         // Inicializa modulo PWM
-void runFAN(uint16_t LM35);    // Controla velocidade do ventilador
-void setLIGHT(uint16_t LDR);   // Controla intensidade da luz
+
 
 // Funcao principal
 int main(void) {
-    PLL_Init();       // Inicializa PLL para 40 MHz
-    GPIO_Init();      // Configura pinos
-    INT0_Init();      // Configura interrupcao
-    MCPWM_Init();     // Inicializa PWM
-    AD_Init();        // Inicializa ADC
+    TRISB = 0;
+    TRISBbits.TRISB7 = 1;
+    AD1PCFGL = 0xFFFF;
     
-    while (1) { 
-      if (!EMERGENCY) {  // Modo normal de operacao
-        TEMPERATURE = ADC_Read(CH_LM35);  // Le temperatura
-        LIGHT = ADC_Read(CH_LDR);         // Le luminosidade
-        runFAN(TEMPERATURE);              // Controla ventilador
-        setLIGHT(LIGHT);                  // Controla luz
-      }
-      else{  // Modo emergencia
-        runFAN(0);      // Desliga ventilador
-        setLIGHT(0);    // Desliga luz
-      }
+    // Habilitar interrupção externa
+    IFS0bits.INT0IF = 0;
+    IEC0bits.INT0IE = 1;
+    
+    // Config. I2C
+    I2C1BRG = 0x004f;
+    I2C1CON = 0x9200;
+    
+    // start uart
+    U1MODE = 0;
+    U1STA = 0;
+    U1MODEbits.STSEL = 0;
+    U1MODEbits.PDSEL = 0b00;
+    U1MODEbits.BRGH = 0;
+    U1MODEbits.UEN = 0b00;   // 
+    U1BRG = BRGVAL;     // baudrate setting
+    // Transmissão
+    U1STAbits.UTXISEL1 = 0;
+    U1STAbits.UTXISEL0 = 0;
+    RPOR6bits.RP12R = 0b00011;
+    IFS0bits.U1TXIF = 0;
+    IEC0bits.U1TXIE = 0;
+    // Recepção
+    U1STAbits.URXISEL = 0b00;
+    RPINR18bits.U1RXR = 13;
+    
+    
+    
+    U1TXREG = 13;
+    
+    I2C1CONbits.SEN = 1;
+    while(I2C1CONbits.SEN);
+    while(I2C1STATbits.TRSTAT);
+    I2C1TRN = controle;
+    while(I2C1STATbits.TRSTAT);
+    I2C1TRN = endM;
+    while(I2C1STATbits.TRSTAT);
+    I2C1TRN = endL;
+    for(i = 0; i < length; i++)
+    {
+        while(I2C1STATbits.TRSTAT);
+        I2C1TRN = Byte[i];
     }
+    while(I2C1STATbits.TRSTAT);
+    I2C1CONbits.PEN = 1;            // Generate Stop Condition
+    while(I2C1CONbits.PEN);         // Wait for stop
+    
+    while (1);
     return 0;
-}
-
-// Tratador de interrupcao INT0 (botao de emergencia)
-void __attribute__((interrupt, auto_psv)) _INT0Interrupt(void)
-{
-    EMERGENCY = !EMERGENCY;  // Alterna estado de emergencia
-    IFS0bits.INT0IF = 0;     // Limpa flag de interrupcao
-}
-
-// Inicializa PLL para 40 MHz
-void PLL_Init(void)
-{
-    PLLFBD = 41;             // M = 43
-    CLKDIVbits.PLLPOST = 0;  // N1 = 2
-    CLKDIVbits.PLLPRE = 0;   // N2 = 2
-    while (OSCCONbits.COSC != 0b001);  // Aguarda PLL travar
-};
-
-// Configura pinos GPIO
-void GPIO_Init(void)
-{
-    AD1PCFGL = 0xFFFF;       // Todos pinos como digitais inicialmente
-    AD1PCFGLbits.PCFG2 = 0;  // AN2 como analogico (LM35)
-    AD1PCFGLbits.PCFG3 = 0;  // AN3 como analogico (LDR)
-    
-    TRISBbits.TRISB0 = 1;    // RB0 como entrada (LM35)
-    TRISBbits.TRISB1 = 1;    // RB1 como entrada (LDR)
-    
-    TRISBbits.TRISB12 = 0;   // RB12 como saida (ILUMINACAO)
-    TRISBbits.TRISB14 = 0;   // RB14 como saida (VENTILADOR)
-    
-    TRISBbits.TRISB7 = 1;    // RB7 como entrada (INT0)
-};
-
-// Inicializa modulo PWM
-void MCPWM_Init(void)
-{
-    P1TCONbits.PTEN = 0;        // Desabilita temporizador
-    P1TCONbits.PTMOD = 0b00;    // Modo free run (dente de serra)
-    P1TCONbits.PTCKPS = 0b00;   // Prescaler 1:1        
-    P1TPER = PERIOD;            // Define periodo do PWM
-    
-    PWM1CON1bits.PEN1H = 1;     // Habilita PWM no pino 1H (VENTILADOR)
-    PWM1CON1bits.PEN2H = 1;     // Habilita PWM no pino 2H (ILUMINACAO)
-    
-    PWM1CON1bits.PMOD1 = 1;     // Modo independente para PWM1
-    PWM1CON1bits.PMOD2 = 1;     // Modo independente para PWM2
-    
-    P1TCONbits.PTEN = 1;        // Habilita temporizador
-}
-
-// Inicializa ADC
-void AD_Init(void)
-{
-    AD1CON1 = 0x0000;        // Conversao manual
-    AD1CON1bits.FORM = 0b00; // Resultado em inteiro
-    AD1CSSL = 0;             // Sem varredura
-    AD1CON2 = 0;             // Referencia = AVdd/AVss
-    AD1CON3 = 0x0002;        // Tad = 3 Tcy
-}
-
-// Le valor do ADC em um canal especifico
-int ADC_Read(uint8_t channel)
-{
-    AD1CON1bits.ADON = 1;        // Liga ADC
-    AD1CHS0bits.CH0SA = channel; // Seleciona canal
-    AD1CON1bits.SAMP = 1;        // Inicia amostragem
-    for(int i = 0; i < 100; i++); // Delay para aquisicao
-    AD1CON1bits.SAMP = 0;        // Inicia conversao
-    while (!AD1CON1bits.DONE);   // Aguarda fim da conversao
-    return ADC1BUF0;             // Retorna valor convertido
-}
-
-// Controla velocidade do ventilador baseado na temperatura
-void runFAN(uint16_t LM35)
-{
-    uint16_t duty = ADC_TO_DUTY(LM35);  // Converte leitura ADC para duty cycle
-    P1DC1 = duty;                       // Aplica duty cycle no PWM
-}
-
-// Controla intensidade da luz baseado na luminosidade
-void setLIGHT(uint16_t LDR)
-{
-    uint16_t duty = ADC_TO_DUTY(LDR);  // Converte leitura ADC para duty cycle
-    P1DC2 = duty;                      // Aplica duty cycle no PWM
-}
-
-// Configura interrupcao externa INT0 (botao de emergencia)
-void INT0_Init(void)
-{
-    INTCON2bits.INT0EP = 1;    // Interrupcao na borda de descida
-    IFS0bits.INT0IF = 0;       // Limpa flag de interrupcao
-    IEC0bits.INT0IE = 1;       // Habilita interrupcao INT0
 }

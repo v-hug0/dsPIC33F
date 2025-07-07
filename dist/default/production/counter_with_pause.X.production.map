@@ -50,8 +50,6 @@ c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(data_
                               c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(crt0_standard.o) (__data_init_standard)
 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(crt_start_mode_normal.Meo)
                               (__crt_start_mode_normal)
-c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(udivsi3.XX_o)
-                              build/default/production/main.o (___udivsi3)
 
 
 xc16-ld 2.10 (A)
@@ -64,20 +62,21 @@ Default Scalar Model: Small
 
 section                    address   length (PC units)   length (bytes) (dec)
 -------                    -------   -----------------   --------------------
-.text                        0x200               0x10e           0x195  (405)
-.text                        0x30e               0x150           0x1f8  (504)
-.dinit                       0x45e                 0x8             0xc  (12)
+.text                        0x200               0x1fc           0x2fa  (762)
+.text                        0x3fc                0xda           0x147  (327)
+.dinit                       0x4d6                0x1a            0x27  (39)
 
-                 Total "program" memory used (bytes):          0x399  (921) 7%
+                 Total "program" memory used (bytes):          0x468  (1128) 9%
 
 
 "data" Memory  [Origin = 0x800, Length = 0x400]
 
 section                    address      alignment gaps    total length  (dec)
 -------                    -------      --------------    -------------------
-.nbss                        0x800                   0             0x8  (8)
+.ndata                       0x800                   0            0x10  (16)
+.nbss                        0x810                   0             0xa  (10)
 
-                 Total "data" memory used (bytes):            0x8  (8) <1%
+                 Total "data" memory used (bytes):           0x1a  (26) 2%
 
 
 Dynamic Memory Usage
@@ -85,26 +84,34 @@ Dynamic Memory Usage
 region                     address                      maximum length  (dec)
 ------                     -------                      ---------------------
 heap                             0                                   0  (0)
-stack                        0x808                               0x3f8  (1016)
+stack                        0x81a                               0x3e6  (998)
 
-                 Maximum dynamic memory (bytes):          0x3f8  (1016)
+                 Maximum dynamic memory (bytes):          0x3e6  (998)
 
 Info: Project is using a large data memory model when small data memory model is sufficient.
 
 
 External Symbols in Data Memory (by address):
 
-                    0x0800                  _TEMPERATURE
-                    0x0802                  _LIGHT
-                    0x0804                  _EMERGENCY
-                    0x0806                  _i
+                    0x0800                  _controle
+                    0x0802                  _length
+                    0x0804                  _Byte
+                    0x0810                  _x
+                    0x0812                  _endM
+                    0x0814                  _endL
+                    0x0816                  _i
+                    0x0818                  _z
 
 External Symbols in Data Memory (by name):
 
-                    0x0804                  _EMERGENCY
-                    0x0802                  _LIGHT
-                    0x0800                  _TEMPERATURE
-                    0x0806                  _i
+                    0x0804                  _Byte
+                    0x0800                  _controle
+                    0x0814                  _endL
+                    0x0812                  _endM
+                    0x0816                  _i
+                    0x0802                  _length
+                    0x0810                  _x
+                    0x0818                  _z
 
 External Symbols in Program Memory (by address):
 
@@ -113,36 +120,18 @@ External Symbols in Program Memory (by address):
                   0x000252                  __data_init_standard
                   0x000252                  __data_init
                   0x0002c8                  __INT0Interrupt
-                  0x0002e8                  __DefaultInterrupt
-                  0x0002ee                  ___udivsi3
-                  0x00030e                  _main
-                  0x000340                  _PLL_Init
-                  0x000368                  _GPIO_Init
-                  0x000380                  _MCPWM_Init
-                  0x0003a6                  _AD_Init
-                  0x0003be                  _ADC_Read
-                  0x0003fa                  _runFAN
-                  0x000426                  _setLIGHT
-                  0x000452                  _INT0_Init
+                  0x0003f6                  __DefaultInterrupt
+                  0x0003fc                  _main
 
 External Symbols in Program Memory (by name):
 
-                  0x0003be                  _ADC_Read
-                  0x0003a6                  _AD_Init
-                  0x000368                  _GPIO_Init
-                  0x000452                  _INT0_Init
-                  0x000380                  _MCPWM_Init
-                  0x000340                  _PLL_Init
-                  0x0002e8                  __DefaultInterrupt
+                  0x0003f6                  __DefaultInterrupt
                   0x0002c8                  __INT0Interrupt
-                  0x0002ee                  ___udivsi3
                   0x000252                  __data_init
                   0x000252                  __data_init_standard
                   0x00023c                  __psv_init
                   0x000200                  __resetPRI
-                  0x00030e                  _main
-                  0x0003fa                  _runFAN
-                  0x000426                  _setLIGHT
+                  0x0003fc                  _main
 
 Memory Configuration
 
@@ -199,7 +188,7 @@ LOAD c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libfx-elf.a
                   0x000002          0x2 SHORT 0x0 ((ABSOLUTE (__reset) >> 0x10) & 0x7f)
                   0x000003          0x2 SHORT 0x0
 
-.text             0x000200        0x10e
+.text             0x000200        0x1fc
  *(.init)
  .init            0x000200         0x4c c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(crt0_standard.o)
                   0x000200                  __resetPRI
@@ -211,20 +200,18 @@ LOAD c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libfx-elf.a
  *(.user_init)
  *(.handle)
  *(.isr*)
- .isr.text        0x0002c8         0x20 build/default/production/main.o
+ .isr.text        0x0002c8        0x12e build/default/production/main.o
                   0x0002c8                  __INT0Interrupt
- .isr             0x0002e8          0x4 default_isr
-                  0x0002e8                  __DefaultInterrupt
+ .isr             0x0003f6          0x4 default_isr
+                  0x0003f6                  __DefaultInterrupt
  *(.libc)
  *(.libm)
  *(.libdsp)
  *(.lib*)
  .libpic30_crt_start_mode
-                  0x0002ec          0x2 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(crt_start_mode_normal.Meo)
-                  0x0002ec                  __crt_start_mode
-                  0x0002ec                  __crt_start_mode_normal
- .libm.udivsi3    0x0002ee         0x20 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(udivsi3.XX_o)
-                  0x0002ee                  ___udivsi3
+                  0x0003fa          0x2 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(crt_start_mode_normal.Meo)
+                  0x0003fa                  __crt_start_mode
+                  0x0003fa                  __crt_start_mode_normal
 
 usercode
  *(usercode)
@@ -267,29 +254,26 @@ __FUID3
 .comment
  *(.comment)
 
-.debug_info       0x000000       0x1493
+.debug_info       0x000000       0x131e
  *(.debug_info)
- .debug_info      0x000000       0x1406 build/default/production/main.o
- .debug_info      0x001406         0x8d c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(udivsi3.XX_o)
+ .debug_info      0x000000       0x131e build/default/production/main.o
  *(.gnu.linkonce.wi.*)
 
-.debug_abbrev     0x000000        0x19c
+.debug_abbrev     0x000000        0x143
  *(.debug_abbrev)
- .debug_abbrev    0x000000        0x188 build/default/production/main.o
- .debug_abbrev    0x000188         0x14 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(udivsi3.XX_o)
+ .debug_abbrev    0x000000        0x143 build/default/production/main.o
 
-.debug_line       0x000000        0x17f
+.debug_line       0x000000        0x13f
  *(.debug_line)
- .debug_line      0x000000        0x13a build/default/production/main.o
- .debug_line      0x00013a         0x45 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(udivsi3.XX_o)
+ .debug_line      0x000000        0x13f build/default/production/main.o
 
-.debug_frame      0x000000        0x128
+.debug_frame      0x000000         0x48
  *(.debug_frame)
- .debug_frame     0x000000        0x128 build/default/production/main.o
+ .debug_frame     0x000000         0x48 build/default/production/main.o
 
-.debug_str        0x000000         0xa3
+.debug_str        0x000000         0x7b
  *(.debug_str)
- .debug_str       0x000000         0xa3 build/default/production/main.o
+ .debug_str       0x000000         0x7b build/default/production/main.o
 
 .debug_loc
  *(.debug_loc)
@@ -298,20 +282,18 @@ __FUID3
  *(.debug_macinfo)
 
 .debug_pubnames
-                  0x000000         0xdc
+                  0x000000         0x8a
  *(.debug_pubnames)
  .debug_pubnames
-                  0x000000         0xdc build/default/production/main.o
+                  0x000000         0x8a build/default/production/main.o
 
 .debug_ranges
  *(.debug_ranges)
 
-.debug_aranges    0x000000         0x38
+.debug_aranges    0x000000         0x18
  *(.debug_aranges)
  .debug_aranges
                   0x000000         0x18 build/default/production/main.o
- .debug_aranges
-                  0x000018         0x20 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(udivsi3.XX_o)
                     0x0000                  WREG0 = 0x0
                     0x0000                  _WREG0 = 0x0
                     0x0002                  WREG1 = 0x2
@@ -950,44 +932,41 @@ LOAD default_isr
 LOAD data_init
 
 .debug_pubtypes
-                  0x000038        0x1a7
+                  0x000018        0x15f
  .debug_pubtypes
-                  0x000038        0x1a7 build/default/production/main.o
+                  0x000018        0x15f build/default/production/main.o
 
 __c30_signature
-                  0x0001df         0x18
+                  0x000177         0x12
  __c30_signature
-                  0x0001df          0x6 build/default/production/main.o
+                  0x000177          0x6 build/default/production/main.o
  __c30_signature
-                  0x0001e5          0x6 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(crt0_standard.o)
+                  0x00017d          0x6 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(crt0_standard.o)
  __c30_signature
-                  0x0001eb          0x6 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(data_init_standard.o)
- __c30_signature
-                  0x0001f1          0x6 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(udivsi3.XX_o)
+                  0x000183          0x6 c:/program files/microchip/xc16/v2.10/bin/bin/../../lib\libc99-pic30-elf.a(data_init_standard.o)
 
-.nbss               0x0800          0x8
- .nbss              0x0800          0x8 build/default/production/main.o
-                    0x0800                  _TEMPERATURE
-                    0x0802                  _LIGHT
-                    0x0804                  _EMERGENCY
-                    0x0806                  _i
+.ndata              0x0800         0x10
+ .ndata             0x0800         0x10 build/default/production/main.o
+                    0x0800                  _controle
+                    0x0802                  _length
+                    0x0804                  _Byte
+
+.nbss               0x0810          0xa
+ .nbss              0x0810          0xa build/default/production/main.o
+                    0x0810                  _x
+                    0x0812                  _endM
+                    0x0814                  _endL
+                    0x0816                  _i
+                    0x0818                  _z
 
 .ivt._INT0Interrupt
                   0x000014          0x2
  .ivt._INT0Interrupt
                   0x000014          0x2 build/default/production/main.o
 
-.text             0x00030e        0x150
- .text            0x00030e        0x150 build/default/production/main.o
-                  0x00030e                  _main
-                  0x000340                  _PLL_Init
-                  0x000368                  _GPIO_Init
-                  0x000380                  _MCPWM_Init
-                  0x0003a6                  _AD_Init
-                  0x0003be                  _ADC_Read
-                  0x0003fa                  _runFAN
-                  0x000426                  _setLIGHT
-                  0x000452                  _INT0_Init
+.text             0x0003fc         0xda
+ .text            0x0003fc         0xda build/default/production/main.o
+                  0x0003fc                  _main
 
-.dinit            0x00045e          0x8
- .dinit           0x00045e          0x8 data_init
+.dinit            0x0004d6         0x1a
+ .dinit           0x0004d6         0x1a data_init
