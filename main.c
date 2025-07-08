@@ -1,174 +1,335 @@
 /*
-
-* Projeto 3 - Estufa Inteligente (ADC + PWM + Interrupcao externa)
-* Equipe: Victor Hugo (497553) e Eduardo Vilas Boas (509925)
-*
-* Descricao:
-* - Leitura de temperatura (LM35 no AN2) e luminosidade (LDR no AN3)
-* - PWM controla ventilador (PWM1H) e iluminacao (PWM2H)
-* - Botao de emergencia (INT0) para desativar todos os sistemas
-*
-* Funcionamento:
-* - Ventilador: velocidade proporcional a leitura AD de temperatura (mais quente = mais rapido)
-* - Iluminacao: intensidade inversamente proporcional a leitura AD de luminosidade (mais escuro = mais luz)
-* - Modo emergencia: desativa ambos sistemas quando o botao e pressionado
-*
-* Configuracoes:
-* - Clock do sistema: 40MHz (FRCPLL com M=43, N1=2, N2=2)
-* - Resolucao ADC: 10 bits (0-1023)
-* - Frequencia PWM: 4 kHz
-* - Interrupcao INT0: borda de descida
-*
-*/
+ * File:   main.c
+ * Author: Amanda e Auro
+ *
+ * Descriï¿½ï¿½o: Este firmware escreve a string "AMANDA" em uma EEPROM externa 24LC256
+ * via I2C, lï¿½ a mesma string de volta e a transmite via UART.
+ *
+ * - I2C: SCL1/SDA1 (Pinos 24/25 do PDIP28)
+ * - UART TX: RP12 (Pino 23 do PDIP28)
+ *
+ * Created on 1 de Julho de 2025, 09:08
+ */
 
 #include "xc.h"
-#include "p33FJ12MC202.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <libpic30.h> // Para a funï¿½ï¿½o __delay_ms
 
 //==============================================================================
-// Configuration Bits Summary
+// Configuration Bits
 //==============================================================================
+// Inicia com FRC, depois troca para FRC com PLL
+_FOSCSEL(FNOSC_FRC); 
+// Habilita a troca de clock, mas desabilita o monitoramento de falha. OSC2 ï¿½ pino de clock. Primï¿½rio desabilitado.
+_FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_NONE); 
+_FWDT(FWDTEN_OFF); // Watchdog Timer desabilitado
+_FICD(JTAGEN_OFF & ICS_PGD1); // Desabilita JTAG, usa PGD1/PGC1 para debug
 
-/*
- * _FOSCSEL(...) - Selecao do Oscilador
- * FNOSC_FRCPLL   -> Usa oscilador interno FRC com PLL para maior frequencia
- */
+//==============================================================================
+// Definiï¿½ï¿½es do Sistema e Perifï¿½ricos
+//==============================================================================
+#define FCY 39625000UL // Frequï¿½ncia de ciclo de instruï¿½ï¿½o (Fosc/2)
 
-/*
- * _FOSC(...) - Configuracao do Oscilador
- * FCKSM_CSECMD   -> Permite mudanca de clock em runtime
- * OSCIOFNC_OFF   -> OSC2 saida do clock do sistema
- * POSCMD_NONE    -> Oscilador primario desabilitado
- */
+// --- Definiï¿½ï¿½es I2C ---
+#define I2C_BAUDRATE 100000UL // Baudrate do I2C (100kHz)
+// I2CBRG = [(FCY/I2C_BAUDRATE) - (FCY/1,111,111)] - 1
+#define I2C_BRG_VAL ((FCY/I2C_BAUDRATE) - (FCY/1111111UL)) - 1
 
-// Configura FRC com PLL como oscilador
-_FOSCSEL(FNOSC_PRI); 
-// Habilita mudanca de clock e configura oscilador
-_FOSC(POSCMD_XT);
+// Endereï¿½os da EEPROM 24LC256 (A2=A1=A0=0)
+#define EEPROM_WRITE_ADDR 0b10100000 // Endereï¿½o base + bit de escrita (0)
+#define EEPROM_READ_ADDR  0b10100001 // Endereï¿½o base + bit de leitura  (1)
 
-// Definicoes de constantes
-#define Fosc 10000000           // Frequencia do sistema (40 MHz)
-#define BAUDRATE 9600
-#define BRGVAL ((Fosc/2/BAUDRATE)/16)-1      // low speed mode
+// --- Definiï¿½ï¿½es UART ---
+#define UART_BAUDRATE 9600
+#define UART_BRG_VAL ((FCY/UART_BAUDRATE)/16)-1 // Modo de baixa velocidade (BRGH=0)
+#define UART_BUFF_SIZE 128
 
-// Variaveis globais
-int x = 0;
-int controle = 0b10100000; // 1010 -> memoria 000 -> end chip 0 -> R/W
-int endM = 0x00;
-int endL = 0x00;
+//==============================================================================
+// Estruturas e Variï¿½veis Globais
+//==============================================================================
+typedef struct {
+    char buff[UART_BUFF_SIZE];
+    volatile uint16_t length;
+    volatile uint16_t index;
+    volatile uint8_t busy;
+} UARTHandler;
 
-int length = 25;
-char Byte[] = {"Victor Hugo"};
-int i,z;
+UARTHandler huart1;
 
-void __attribute__((interrupt, shadow, no_auto_psv)) _INT0Interrupt(void)
-{
-    IFS0bits.INT0IF = 0;
-    U1TXREG = 0x00;
-    
-    I2C1CONbits.SEN = 1;
-    while(I2C1CONbits.SEN);
-    while(I2C1STATbits.TRSTAT);
-    I2C1TRN = controle;
-    while(I2C1STATbits.TRSTAT);
-    I2C1TRN = endM;
-    while(I2C1STATbits.TRSTAT);
-    I2C1TRN = 0x00;
-    while(I2C1STATbits.TRSTAT);
-    I2C1CONbits.RSEN = 1;           // Generate Restart
-    while(I2C1CONbits.RSEN);
-    while(I2C1STATbits.TRSTAT);
-    I2C1TRN = controle | 1;
-    while(I2C1STATbits.TBF);
-    for(i = 0; i < length; i++)
-    {
-        while(I2C1STATbits.TRSTAT);
-        I2C1CONbits.RCEN = 1;       // Enable Master Receive
-    Nop();
-    while(!I2C1STATbits.RBF);
-        U1TXREG = I2C1RCV;
-        for(z=0; z<450; z++);
-        if(i<(length-1))
-        {
-            while(I2C1STATbits.TRSTAT);
-            I2C1CONbits.ACKDT = 0;  // Set for ACK
-            I2C1CONbits.ACKEN = 1;
-        } else {
-        while(I2C1STATbits.TRSTAT);
-        I2C1CONbits.ACKDT = 1;      // Set for NotACK
-        I2C1CONbits.ACKEN = 1;
-        while(I2C1CONbits.ACKEN);   // Wait for ACK to complete
-        I2C1CONbits.ACKDT = 0;      // Set for NotACK
-        }
+// Definiï¿½ï¿½o dos dados e endereï¿½o
+uint16_t memory_address = 0x0000; // Endereï¿½o de memï¿½ria para escrita/leitura
+const uint8_t data_to_write[] = "AMANDA SOUZA E AURO ARAMIDES";
+uint8_t data_length;
+
+// Buffer para armazenar os dados lidos da EEPROM
+char read_buffer[UART_BUFF_SIZE];
+char message_buffer[UART_BUFF_SIZE];
+
+//==============================================================================
+// Protï¿½tipos de Funï¿½ï¿½es
+//==============================================================================
+// Sistema
+void OSC_Init(void);
+void GPIO_Init(void);
+
+// UART
+void UART1_Init(void);
+uint8_t UART1_SendString(char* str);
+
+// I2C
+void I2C1_Init(void);
+void I2C1_Start(void);
+void I2C1_Stop(void);
+void I2C1_Restart(void);
+void I2C1_Write(uint8_t data);
+uint8_t I2C1_Read(void);
+void I2C1_Ack(void);
+void I2C1_Nack(void);
+void I2C1_WaitForIdle(void);
+
+// EEPROM
+void EEPROM_WritePage(uint16_t addr, uint8_t *data, uint8_t length);
+void EEPROM_ReadPage(uint16_t addr, uint8_t *buffer, uint8_t length);
+void EEPROM_EraseAll(void);
+void EEPROM_WaitWriteComplete(void) ;
+//==============================================================================
+// Funï¿½ï¿½o Principal
+//==============================================================================
+int main(void) {
+    // 1. Inicializaï¿½ï¿½o do sistema
+    OSC_Init();
+    GPIO_Init();
+    I2C1_Init();
+    UART1_Init();
+
+//    EEPROM_EraseAll();  // Apaga tudo 
+    data_length = strlen((char*)data_to_write);
+
+    // Escreve na EEPROM
+    EEPROM_WritePage(memory_address, data_to_write, data_length);
+    EEPROM_WaitWriteComplete();  
+
+    while(1) {
+        // O microcontrolador pode entrar em modo de baixo consumo aqui.
     }
-
-    while(I2C1STATbits.TRSTAT);
-    I2C1CONbits.PEN = 1;            // Generate Stop Condition
-    while(I2C1CONbits.PEN);         // Wait for stop
-    LATBbits.LATB0 = !LATBbits.LATB0;
-    z++;
+    return 0;
 }
 
-// Prototipos de funcoes
-
-
-// Funcao principal
-int main(void) {
-    TRISB = 0;
-    TRISBbits.TRISB7 = 1;
-    AD1PCFGL = 0xFFFF;
-    
-    // Habilitar interrupção externa
-    IFS0bits.INT0IF = 0;
-    IEC0bits.INT0IE = 1;
-    
-    // Config. I2C
-    I2C1BRG = 0x004f;
-    I2C1CON = 0x9200;
-    
-    // start uart
-    U1MODE = 0;
-    U1STA = 0;
-    U1MODEbits.STSEL = 0;
-    U1MODEbits.PDSEL = 0b00;
-    U1MODEbits.BRGH = 0;
-    U1MODEbits.UEN = 0b00;   // 
-    U1BRG = BRGVAL;     // baudrate setting
-    // Transmissão
-    U1STAbits.UTXISEL1 = 0;
-    U1STAbits.UTXISEL0 = 0;
-    RPOR6bits.RP12R = 0b00011;
+//==============================================================================
+// Rotinas de Interrupï¿½ï¿½o (ISRs)
+//==============================================================================
+void __attribute__((__interrupt__, no_auto_psv)) _U1TXInterrupt(void) {
     IFS0bits.U1TXIF = 0;
-    IEC0bits.U1TXIE = 0;
-    // Recepção
-    U1STAbits.URXISEL = 0b00;
-    RPINR18bits.U1RXR = 13;
-    // Habilita
+    if (huart1.index < huart1.length) {
+        U1TXREG = huart1.buff[huart1.index++];
+    } else {
+        huart1.busy = 0;
+    }
+}
+
+void __attribute__((__interrupt__, no_auto_psv)) _INT0Interrupt(void) {
+    IFS0bits.INT0IF = 0;  // Limpa flag
+ 
+    // Lï¿½ da EEPROM
+    EEPROM_ReadPage(memory_address, (uint8_t*)read_buffer, data_length);
+    read_buffer[data_length] = '\0'; // Adiciona o terminador nulo para formar uma string vï¿½lida
+
+    // Envia os dados lidos pela UART
+    snprintf(message_buffer, UART_BUFF_SIZE, "Dado lido da EEPROM: %s\n\r", read_buffer);
+    UART1_SendString(message_buffer);
+}
+
+//==============================================================================
+// Funï¿½ï¿½es de Inicializaï¿½ï¿½o
+//==============================================================================
+void OSC_Init(void) {
+    PLLFBD = 41; // M = 43
+    CLKDIVbits.PLLPOST = 0; // N1 = 2
+    CLKDIVbits.PLLPRE = 0;  // N2 = 2
+    __builtin_write_OSCCONH(0x01);
+    __builtin_write_OSCCONL(OSCCON | 0x01);
+    while (OSCCONbits.OSWEN);
+    while (OSCCONbits.LOCK != 1);
+}
+
+void GPIO_Init(void) {
+    AD1PCFGL = 0xFFF; // Pinos analï¿½gicos como digitais
+    TRISBbits.TRISB7 = 1;      // RB7 como entrada (INT0)
+
+    // Configura INT0 no RB7
+    INTCON2bits.INT0EP = 1;    // Interrupï¿½ï¿½o na borda de descida
+    IFS0bits.INT0IF = 0;       // Limpa flag
+    IEC0bits.INT0IE = 1;       // Habilita INT0
+}
+
+
+
+
+void UART1_Init(void) {
+    // Mapeia a funï¿½ï¿½o de transmissï¿½o da UART1 (U1TX) para o pino RP12
+    RPOR6bits.RP12R = 3; // 3 ï¿½ o cï¿½digo para U1TX
+    TRISBbits.TRISB12 = 0; // Configura o pino RP12 como saï¿½da
+
+    U1MODEbits.STSEL = 0;
+    U1MODEbits.PDSEL = 0;
+    U1MODEbits.ABAUD = 0;
+    U1MODEbits.BRGH = 0;
+    U1BRG = UART_BRG_VAL;
+    U1STAbits.UTXISEL0 = 0;
+    U1STAbits.UTXISEL1 = 0;
+    IEC0bits.U1TXIE = 1;
     U1MODEbits.UARTEN = 1;
     U1STAbits.UTXEN = 1;
-    
-    U1TXREG = 13;
-    
+}
+
+void I2C1_Init(void) {
+    I2C1BRG = (uint16_t)I2C_BRG_VAL;
+    I2C1CONbits.I2CEN = 1;
+    I2C1CONbits.DISSLW = 1; // Desabilita slew rate para modo padrï¿½o
+}
+
+//==============================================================================
+// Funï¿½ï¿½es de Comunicaï¿½ï¿½o I2C
+//==============================================================================
+void I2C1_WaitForIdle(void) {
+    while (I2C1CONbits.SEN || I2C1CONbits.PEN || I2C1CONbits.RCEN || 
+           I2C1CONbits.RSEN || I2C1CONbits.ACKEN || I2C1STATbits.TRSTAT);
+}
+
+void I2C1_Start(void) {
+    I2C1_WaitForIdle();
     I2C1CONbits.SEN = 1;
     while(I2C1CONbits.SEN);
-    while(I2C1STATbits.TRSTAT);
-    I2C1TRN = controle;
-    while(I2C1STATbits.TRSTAT);
-    I2C1TRN = endM;
-    while(I2C1STATbits.TRSTAT);
-    I2C1TRN = endL;
-    for(i = 0; i < length; i++)
-    {
-        while(I2C1STATbits.TRSTAT);
-        I2C1TRN = Byte[i];
+}
+
+void I2C1_Stop(void) {
+    I2C1_WaitForIdle();
+    I2C1CONbits.PEN = 1;
+    while(I2C1CONbits.PEN);
+}
+
+void I2C1_Restart(void) {
+    I2C1_WaitForIdle();
+    I2C1CONbits.RSEN = 1;
+    while(I2C1CONbits.RSEN);
+}
+
+void I2C1_Write(uint8_t data) {
+    I2C1_WaitForIdle();
+    I2C1TRN = data;
+    while(I2C1STATbits.TBF); // Espera o buffer de transmissï¿½o ficar vazio
+    I2C1_WaitForIdle();
+    // Adicionado verificaï¿½ï¿½o de ACK
+    if (I2C1STATbits.ACKSTAT) { // 1 = NACK recebido
+       // Tratar erro de NACK se necessï¿½rio
     }
-    while(I2C1STATbits.TRSTAT);
-    I2C1CONbits.PEN = 1;            // Generate Stop Condition
-    while(I2C1CONbits.PEN);         // Wait for stop
+}
+
+uint8_t I2C1_Read(void) {
+    I2C1_WaitForIdle();
+    I2C1CONbits.RCEN = 1;
+    while(!I2C1STATbits.RBF);
+    return I2C1RCV;
+}
+
+void I2C1_Ack(void) {
+    I2C1_WaitForIdle();
+    I2C1CONbits.ACKDT = 0;
+    I2C1CONbits.ACKEN = 1;
+    while(I2C1CONbits.ACKEN);
+}
+
+void I2C1_Nack(void) {
+    I2C1_WaitForIdle();
+    I2C1CONbits.ACKDT = 1;
+    I2C1CONbits.ACKEN = 1;
+    while(I2C1CONbits.ACKEN);
+}
+
+//==============================================================================
+// Funï¿½ï¿½es de Acesso ï¿½ EEPROM
+//==============================================================================
+void EEPROM_WritePage(uint16_t addr, uint8_t *data, uint8_t length) {
+    if (length > 64) length = 64;
+    I2C1_Start();
+    I2C1_Write(EEPROM_WRITE_ADDR);
+    I2C1_Write((addr >> 8) & 0xFF); // Endereï¿½o Alto
+    I2C1_Write(addr & 0xFF);        // Endereï¿½o Baixo
+    for (uint8_t i = 0; i < length; i++) {
+        I2C1_Write(data[i]);
+    }
+    I2C1_Stop();
+}
+
+void EEPROM_ReadPage(uint16_t addr, uint8_t *buffer, uint8_t length) {
+    // 1. "Dummy Write" para posicionar o ponteiro de endereï¿½o da EEPROM
+    I2C1_Start();
+    I2C1_Write(EEPROM_WRITE_ADDR);
+    I2C1_Write((addr >> 8) & 0xFF); // Endereï¿½o Alto
+    I2C1_Write(addr & 0xFF);        // Endereï¿½o Baixo
+
+    // 2. Reinicia a comunicaï¿½ï¿½o para iniciar a leitura
+    I2C1_Restart();
+    I2C1_Write(EEPROM_READ_ADDR); // Envia endereï¿½o do dispositivo com bit de leitura
+
+    // 3. Lï¿½ os bytes sequencialmente
+    for (uint8_t i = 0; i < length; i++) {
+        buffer[i] = I2C1_Read();
+        if (i < (length - 1)) {
+            I2C1_Ack(); // Envia ACK para continuar lendo
+        } else {
+            I2C1_Nack(); // Envia NACK no ï¿½ltimo byte para sinalizar o fim
+        }
+    }
+    I2C1_Stop();
+}
+
+
+void EEPROM_EraseAll(void) 
+{
+    uint8_t blank[64];
+    for (uint8_t i = 0; i < 64; i++) blank[i] = 0xFF;
+
+    for (uint16_t addr = 0; addr < 0x8000; addr += 64) {
+        EEPROM_WritePage(addr, blank, 64);
+
+        // Aguarda EEPROM ficar pronta
+        while (1) {
+            I2C1_Start();
+            I2C1_Write(EEPROM_WRITE_ADDR);
+            I2C1_Stop();
+            if (!I2C1STATbits.ACKSTAT) break;
+        }
+    }
+}
+
+
+void EEPROM_WaitWriteComplete(void) 
+{
+    do {
+        I2C1_Start();
+        I2C1_Write(EEPROM_WRITE_ADDR); // Tenta fazer um write dummy
+        I2C1_Stop();
+    } while (I2C1STATbits.ACKSTAT); // Enquanto nï¿½o receber ACK, ainda estï¿½ ocupada
+}
+
+
+//==============================================================================
+// Funï¿½ï¿½es de Comunicaï¿½ï¿½o UART
+//==============================================================================
+uint8_t UART1_SendString(char* str) {
+    if (huart1.busy) return 0;
+    uint16_t len = strlen(str);
+    if (len == 0 || len >= UART_BUFF_SIZE) return 0;
     
-    while (1);
-    return 0;
+    memcpy(huart1.buff, str, len);
+    huart1.length = len;
+    huart1.index = 1;
+    huart1.busy = 1;
+    
+    U1TXREG = huart1.buff[0];
+    return 1;
 }
