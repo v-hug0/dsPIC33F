@@ -146,8 +146,9 @@ int main(void) {
     // Recepção
     U1STAbits.URXISEL = 0b00;
     RPINR18bits.U1RXR = 13;
-    
-    
+    // Habilita
+    U1MODEbits.UARTEN = 1;
+    U1STAbits.UTXEN = 1;
     
     U1TXREG = 13;
     
